@@ -29,3 +29,15 @@ The durable product target is a provider-neutral work log expressed as `project:
 **Status:** Accepted
 
 Cross-cutting product boundaries, domain concepts, architecture, decisions, and QA entry points belong in `docs/`. Parsing rules, data-shape details, error handling, and fixture behavior stay adjacent to the code and tests that own them. This reduces duplicated contracts and stale implementation documentation.
+
+## D-006: Preserve Precision Until Review
+
+**Status:** Accepted
+
+Draft inclusion uses raw positive milliseconds. Rounded decimal hours are a display projection and cannot decide whether evidence exists. This keeps short work and local-day fragments visible without imposing Harvest billing policy on source evidence.
+
+## D-007: Keep the Existing Runtime Split
+
+**Status:** Accepted
+
+JavaScript is the OMP integration runtime; Ruby provides the existing standalone Harvest adapter and business-day dependencies. Their boundary separates local evidence analysis from explicit external writes. Consolidation needs a demonstrated benefit and equivalent behavioral proof, not a preference for a single language. See [runtime and language boundaries](/docs/architecture.md#runtime-and-language-boundaries).

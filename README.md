@@ -81,11 +81,15 @@ Type `/worklog ` in OMP to discover `timesheet`; date aliases appear after selec
 
 ## OMP settings
 
+The manifest declares the following settings. **Persisted settings are currently inactive in the extension**: OMP does not expose resolved user-plus-project plugin settings at factory initialization. Explicit factory options work for programmatic callers and tests. [Issue #134](https://github.com/klondikemarlen/omp-worklog/issues/134) tracks the host dependency; do not assume a successful `omp plugin config set` changed runtime behavior.
+
 - `defaultHours`: hours per business day when a time-off tool call omits `hours`; defaults to `7`.
 - `holidayRegions`: comma-separated Holidays regions; defaults to `ca_yt`.
 - `command`: direct path to the `omp-worklog` executable.
 - `projectTimeLogPath`: optional path to Project Time v1 evidence; defaults to `~/.omp/project-time/time-log.sqlite`. A legacy versioned JSON snapshot is also supported.
+- `projectTimeMappings`: optional JSON mapping of exact local projects to Harvest project/task names; defaults to `{}`.
 
+The host stores user plugin settings in `~/.omp/plugins/omp-plugins.lock.json` and project overrides in `.omp/plugin-overrides.json`. Back up private configuration outside Git before uninstalling/reinstalling a plugin. Worklog deliberately does not parse these files itself or bypass project precedence.
 
 ## OMP Project Time integration
 
@@ -101,6 +105,10 @@ OMP Worklog reads Project Time's persisted `omp-project-time/evidence` v1 entrie
 
 `omp_worklog_preview_project_time_drafts` produces deterministic, copyable Date/Project/Task/Duration blocks from all local `human_active` evidence in an inclusive date range. Mapped evidence uses its configured Harvest destination; unmapped, ambiguous, and unassigned evidence remains an explicit local-project draft. It preserves source entry IDs, intervals, source kind, repository identity, narratives, work items, and task-attribution provenance. Generated narratives are review evidence, never task identity or a factual Harvest note. The tool reads the local log only; it never calls or mutates Harvest.
 
+Drafts preserve every positive interval using raw milliseconds, even when rounded decimal `hours` are zero. Exact displayed duration is review evidence, not a Harvest rounding or billable-time policy. Both range endpoints must be real calendar dates.
+
+For independent comparison with manually recorded Harvest entries, follow the [private calibration workflow](/docs/calibration.md). Do not tune from incomplete baselines or commit personal evidence.
+
 ### Activity transforms
 
 `omp_worklog_preview_project_time_transforms` emits deterministic JSON for local raw intervals. It accepts an inclusive date range and optional exact `repositoryId`, `project`, and `sourceKind` filters; each matching interval is split by local date and grouped by activity, with missing labels reported as `unlabelled`. It defaults to `human_active` and returns the effective top-level `sourceKind`; selecting `agent_turn_elapsed` requires an explicit source-kind request. Set `applyMappings` to create configured Harvest destinations or review-required local destinations for every included group. The output reports groups and draft entries; it never writes Harvest.
@@ -113,6 +121,13 @@ Version `0.14.0` is a clean identity cutover. Uninstall the retired `harvest-wor
 
 Version `0.14.3` renames the OMP slash command from `/omp-worklog` to `/worklog`; the `omp-worklog` package identity and CLI executable are unchanged.
 
+## Changes in 0.14.4
+
+- Preserve short positive durations in mapped and review-required drafts.
+- Refresh project-name completion when SQLite commits evidence through its write-ahead log.
+- Reject impossible calendar dates in transform ranges.
+- Document configuration activation limits, runtime ownership, and private calibration.
+
 ## Release
 
 Before merging a release PR, self-review its complete diff, address every actionable review comment, and rerun focused QA after fixups. Record the review and QA evidence on the PR. Then merge to `main`, build and publish the Ruby gem, install the released OMP plugin from GitHub, and verify it:
@@ -120,20 +135,17 @@ Before merging a release PR, self-review its complete diff, address every action
 ```bash
 ruby test_omp_worklog.rb
 npm run test:omp
-omp-worklog time-off 2026-08-17 2026-08-28 \
-  --project 'Time Off - Marlen' \
-  --task 'Vacation / PTO' \
-  --holiday-region ca_yt \
-  --dry-run
+bin/omp-worklog --help
 VERSION="$(ruby -Ilib -romp_worklog/version -e 'puts OmpWorklog::VERSION')"
 gem build omp-worklog.gemspec
 gem push "omp-worklog-${VERSION}.gem"
-gem uninstall harvest-worklog --all --executables --ignore-dependencies
+gem uninstall omp-worklog --all --executables --ignore-dependencies
 gem install --clear-sources --source https://rubygems.org omp-worklog --version "$VERSION" --no-document
-omp plugin uninstall harvest-worklog
 npm run release
 npm run verify:release
 omp-worklog --help
 ```
 
-`npm run release` owns the uninstall/force-install mutation. `npm run verify:release` never changes the installation: it checks the installed package version, resolved Git revision, and plugin path before running a deterministic slash-command smoke test against the installed plugin. It exits after verification. Existing OMP sessions retain startup-loaded extension code; restart them before optional manual autocomplete and slash-command QA.
+`npm run release` owns the plugin uninstall/force-install mutation, including removal of the retired plugin when present. `npm run verify:release` never changes the installation: it checks the installed package version, resolved Git revision, and plugin path, then runs the installed JavaScript test suite. It exits after verification; tests alone do not exercise a fresh OMP host.
+
+After installation, start a new OMP process and exercise `/worklog` completion and a timesheet against synthetic local evidence. Verify that a newly committed SQLite project appears without restarting that process. Existing sessions retain startup-loaded extension code and cannot prove the released artifact. Use explicit factory options for a mapped smoke until #134 is resolved; do not claim persisted-setting activation from that smoke.

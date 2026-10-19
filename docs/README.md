@@ -9,6 +9,7 @@ OMP Worklog turns local OMP Project Time evidence into reviewable work-log outpu
 - [Architecture](architecture.md) — the current local data flow and side-effect boundary.
 - [Decisions](decisions.md) — durable decisions that explain why the current behavior is constrained.
 - [QA evidence](qa.md) — how to validate documented behavior and where detailed test evidence lives.
+- [Calibration](/docs/calibration.md) — independent private references, frozen daily evidence, discrepancy review, and holdout evaluation.
 
 ## Authority Boundaries
 
