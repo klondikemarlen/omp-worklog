@@ -1,12 +1,13 @@
 {
   "name": "omp-worklog",
-  "version": "0.14.6",
-  "description": "OMP Project Time work logs with an optional manual Harvest destination.",
+  "version": "0.15.0",
+  "description": "Concurrent-project work logs with reviewed, safe Harvest batch filing.",
   "type": "module",
   "license": "MIT",
   "scripts": {
     "test": "npm run test:omp",
     "test:omp": "node --test test/*.test.js",
+    "test:ruby": "ruby test_omp_worklog.rb && ruby test_batch_cli.rb",
     "release": "bin/release-plugin",
     "verify:release": "bin/verify-plugin-release"
   },
@@ -47,6 +48,13 @@
         "type": "string",
         "default": "",
         "description": "Optional Project Time evidence path; defaults to ~/.omp/project-time/time-log.sqlite. A legacy v1 JSON snapshot is also supported."
+      },
+      "responseGraceMinutes": {
+        "type": "number",
+        "default": 5,
+        "min": 0,
+        "max": 60,
+        "description": "Maximum same-session response gap in review-required concurrent-work candidates; does not certify progress or authorize billing."
       }
     }
   },
