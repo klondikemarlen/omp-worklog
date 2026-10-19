@@ -464,7 +464,24 @@ async function requestProjectTimeSummary(pi, ctx, plan, completeSummary) {
   }, { triggerTurn: false })
 }
 
-export default function ompWorklogExtension(pi, options = {}) {
+async function loadOmpPluginSettings(cwd) {
+  const diagnostic = "Could not resolve OMP Worklog settings; run omp plugin config list omp-worklog --json in this project."
+  const result = await runCommand("omp", ["plugin", "config", "list", "omp-worklog", "--json"], { cwd })
+  if (result.code !== 0) throw new Error(diagnostic)
+
+  try {
+    const { settings } = JSON.parse(result.stdout)
+    if (settings && typeof settings === "object" && !Array.isArray(settings)) return settings
+  } catch {
+    // CLI diagnostics may contain private values; expose only the recovery command.
+  }
+  throw new Error(diagnostic)
+}
+
+export default async function ompWorklogExtension(pi, options = {}) {
+  const loadSettings = options.loadPluginSettings ?? loadOmpPluginSettings
+  const settings = pi.cwd ? await loadSettings(pi.cwd) : {}
+  options = { ...settings, ...options }
   pi.setLabel?.("OMP Worklog")
   const command = normalizeCommand(options.command)
   const projectTimeMappings = options.projectTimeMappings?.trim() || "{}"
