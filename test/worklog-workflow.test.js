@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import test from "node:test"
@@ -115,4 +115,98 @@ test("completion discovers exact projects after a two-date stats range", () => {
   // Assert
   assert.deepEqual(choices.map(choice => choice.value), ['stats 2026-10-05 2026-10-19 --project "Demo Project"'])
   assert.deepEqual(cutoff.map(choice => choice.value), ["plan today --until 12:00", "plan today --until 17:00"])
+})
+
+test("daily review accepts today by default and completes agent-only projects without a date", () => {
+  assert.deepEqual(parseOmpWorklogArguments("review"), { argv: ["review"] })
+  assert.deepEqual(parseOmpWorklogArguments('review --project "Agent Project" --until 17:00'), {
+    argv: ["review", "--project", "Agent Project", "--until", "17:00"],
+  })
+  assert.equal(parseOmpWorklogArguments("review today yesterday"), null)
+  const choices = ompWorklogArgumentCompletions("review --project Agent", ["Agent Project"])
+  assert.deepEqual(choices.map(choice => choice.value), ['review --project "Agent Project"'])
+})
+
+test("headless daily review cannot prepare or approve a provider write", async () => {
+  await assert.rejects(runWorklogAction(["review"], { hasUI: false }, {
+    projectTimeLogPath: "/nonexistent-worklog-evidence",
+    run: async () => assert.fail("Headless daily review must never invoke the destination"),
+  }), /requires interactive OMP/)
+})
+
+test("saving daily review preserves private edits and reopening resumes the same draft", async t => {
+  const directory = mkdtempSync(path.join(tmpdir(), "worklog-daily-resume-"))
+  t.after(() => rmSync(directory, { recursive: true, force: true }))
+  const logPath = path.join(directory, "evidence.json")
+  const startAtMs = new Date(2026, 9, 18, 9).getTime()
+  writeFileSync(logPath, JSON.stringify({
+    format: "omp-project-time/evidence", version: 1,
+    entries: [{ id: "daily-source", project: "Demo", sourceKind: "agent_turn_elapsed", sessionId: "daily-session", startAtMs, endAtMs: startAtMs + 3_600_000 }],
+  }))
+  const options = {
+    dataDirectory: directory, projectTimeLogPath: logPath,
+    projectTimeMappings: '{"Demo":{"project":"Internal","task":"Development"}}',
+    run: async () => assert.fail("Saving a daily draft must not invoke the destination"),
+  }
+  const actions = ["project", "Edit note", "Back", "Save and close"]
+  const context = { hasUI: true, ui: {
+    select: async (_title, choices) => {
+      const action = actions.shift()
+      return action === "project" ? choices[0].label : action
+    },
+    editor: async () => "Reviewed daily implementation work",
+    confirm: async () => assert.fail("Saving must not request provider approval"),
+    notify: () => {},
+  } }
+
+  const saved = await runWorklogAction(["review", "2026-10-18"], context, options)
+  const resumed = await runWorklogAction(["review", "2026-10-18"], {
+    ...context, ui: { ...context.ui, select: async () => "Save and close" },
+  }, options)
+
+  const batch = JSON.parse(readFileSync(saved.details.batchPath, "utf8"))
+  assert.equal(resumed.details.batchPath, saved.details.batchPath)
+  assert.equal(batch.approved, false)
+  assert.equal(batch.entries[0].notes, "Reviewed daily implementation work")
+  assert.equal(batch.entries[0].reviewed, false)
+  assert.equal(statSync(saved.details.batchPath).mode & 0o777, 0o600)
+})
+
+test("refreshing evidence preserves the edited prior draft and requires a fresh review", async t => {
+  const directory = mkdtempSync(path.join(tmpdir(), "worklog-daily-refresh-"))
+  t.after(() => rmSync(directory, { recursive: true, force: true }))
+  const logPath = path.join(directory, "evidence.json")
+  const startAtMs = new Date(2026, 9, 18, 9).getTime()
+  const evidence = {
+    format: "omp-project-time/evidence", version: 1,
+    entries: [{ id: "refresh-source", project: "Demo", sourceKind: "human_active", sessionId: "refresh-session", startAtMs, endAtMs: startAtMs + 3_600_000 }],
+  }
+  writeFileSync(logPath, JSON.stringify(evidence))
+  const options = { dataDirectory: directory, projectTimeLogPath: logPath, run: async () => assert.fail("Refreshing must not invoke the provider") }
+  const actions = ["project", "Edit note", "Back", "Save and close", "Refresh evidence", "Save and close"]
+  const context = { hasUI: true, ui: {
+    select: async (_title, choices) => {
+      const action = actions.shift()
+      return action === "project" ? choices[0].label : action
+    },
+    editor: async () => "Preserve this reviewed context",
+    confirm: async () => true,
+    notify: () => {},
+  } }
+
+  const initial = await runWorklogAction(["review", "2026-10-18"], context, options)
+  evidence.entries[0].endAtMs = startAtMs + 7_200_000
+  writeFileSync(logPath, JSON.stringify(evidence))
+  await runWorklogAction(["review", "2026-10-18"], context, options)
+
+  const reviewDirectory = path.dirname(initial.details.batchPath)
+  const previous = readdirSync(reviewDirectory).find(name => name.startsWith("previous-"))
+  const preserved = JSON.parse(readFileSync(path.join(reviewDirectory, previous, "review.json"), "utf8"))
+  const refreshed = JSON.parse(readFileSync(initial.details.batchPath, "utf8"))
+  assert.equal(preserved.entries[0].notes, "Preserve this reviewed context")
+  assert.equal(preserved.entries[0].candidateMilliseconds, 3_600_000)
+  assert.equal(refreshed.entries[0].candidateMilliseconds, 7_200_000)
+  assert.equal(refreshed.entries[0].notes, "")
+  assert.equal(refreshed.entries[0].reviewed, false)
+  assert.equal(refreshed.approved, false)
 })

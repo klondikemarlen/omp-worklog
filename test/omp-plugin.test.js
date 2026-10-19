@@ -215,7 +215,7 @@ test("when completing timesheet arguments, it suggests contextual values", () =>
   ]
 
   // Assert
-  assert.deepEqual(root.map(item => item.value), ["timesheet", "stats", "plan", "submit", "help"])
+  assert.deepEqual(root.map(item => item.value), ["review", "timesheet", "stats", "plan", "submit", "help"])
   assert.deepEqual(prefix.map(item => item.value), ["timesheet"])
   assert.deepEqual(dates.slice(0, 2).map(item => item.value), ["timesheet today", "timesheet yesterday"])
   assert.match(dates[2].value, /^timesheet \d{4}-\d{2}-\d{2}$/)

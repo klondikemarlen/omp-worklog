@@ -236,13 +236,15 @@ const WORKLOG_COMMAND = "worklog"
 
 const OMP_WORKLOG_USAGE = [
   "Usage:",
+  `  /${WORKLOG_COMMAND} review [DATE] [--project PROJECT] [--until HH:MM]`,
   `  /${WORKLOG_COMMAND} timesheet DATE [--project PROJECT]`,
   `  /${WORKLOG_COMMAND} stats FROM [TO] [--project PROJECT] [--until HH:MM]`,
   `  /${WORKLOG_COMMAND} plan DATE [--project PROJECT] [--until HH:MM]`,
   `  /${WORKLOG_COMMAND} submit BATCH_PATH [--dry-run]`,
   "",
   "Dates: today, yesterday, or YYYY-MM-DD. --until clips only the final day.",
-  "Plans require reviewed notes/durations and one explicit approval before filing.",
+  "Review defaults to today: edit entries inside OMP, then choose Submit to Harvest.",
+  "Plans remain available for file-based and programmatic review.",
 ].join("\n")
 
 const DATE_COMPLETIONS = [
@@ -267,6 +269,7 @@ export function ompWorklogArgumentCompletions(argumentPrefix, projects = []) {
   const input = argumentPrefix
   const trimmed = input.trim()
   const choices = [
+    { label: "review", value: "review", description: "Review today's worklog inside OMP, then submit" },
     { label: "timesheet", value: "timesheet", description: "Review compact human-active totals" },
     { label: "stats", value: "stats", description: "Compare daily human and AI timings by project" },
     { label: "plan", value: "plan", description: "Prepare a private concurrent-work review batch" },
@@ -284,7 +287,7 @@ export function ompWorklogArgumentCompletions(argumentPrefix, projects = []) {
 
     return completionForFlag(input, { "--dry-run": "Preflight without creating Harvest entries", "--help": "Show command help" })
   }
-  if (!["timesheet", "stats", "plan"].includes(first)) return null
+  if (!["review", "timesheet", "stats", "plan"].includes(first)) return null
 
   const optionIndex = words.findIndex((word, index) => index > 0 && word.startsWith("--"))
   const positionals = words.slice(1, optionIndex === -1 ? words.length : optionIndex)
@@ -296,7 +299,7 @@ export function ompWorklogArgumentCompletions(argumentPrefix, projects = []) {
       .filter(choice => choice.value.startsWith(partial.toLowerCase()))
       .map(choice => ({ ...choice, value: [...base, choice.value].join(" ") }))
   }
-  if (!positionals.length || positionals.length > maximumDates || positionals.some(value => !DATE_PATTERN.test(value))) return null
+  if ((!positionals.length && first !== "review") || positionals.length > maximumDates || positionals.some(value => !DATE_PATTERN.test(value))) return null
 
   const projectCompletions = completionForProject(input, projects)
   if (projectCompletions) return projectCompletions
@@ -439,8 +442,8 @@ export function parseCommandArguments(input) {
 
 function isWorklogForm(words, allowIncomplete = false) {
   const command = words[0]
-  if (!["timesheet", "stats", "plan", "submit"].includes(command)) return false
-  if (allowIncomplete && words.length === 1) return true
+  if (!["review", "timesheet", "stats", "plan", "submit"].includes(command)) return false
+  if ((allowIncomplete || command === "review") && words.length === 1) return true
   if (command === "submit") {
     return Boolean(words[1]) && !words[1].startsWith("--") &&
       (words.length === 2 || (words.length === 3 && words[2] === "--dry-run"))
@@ -448,7 +451,7 @@ function isWorklogForm(words, allowIncomplete = false) {
 
   const optionIndex = words.findIndex((word, index) => index > 0 && word.startsWith("--"))
   const dates = words.slice(1, optionIndex === -1 ? undefined : optionIndex)
-  if (!dates.length || dates.length > (command === "stats" ? 2 : 1) || dates.some(date => !DATE_PATTERN.test(date))) return false
+  if ((!dates.length && command !== "review") || dates.length > (command === "stats" ? 2 : 1) || dates.some(date => !DATE_PATTERN.test(date))) return false
   if (optionIndex === -1) return true
 
   const seen = new Set()
@@ -557,9 +560,9 @@ export default async function ompWorklogExtension(pi, options = {}) {
     run: options.runWorklogCommand ?? runCommand,
   }
   pi.registerCommand(WORKLOG_COMMAND, {
-    description: "Review human/AI evidence, prepare concurrent worklogs, and file approved batches",
+    description: "Review today's worklog and submit it, or inspect human/AI evidence and private plans",
     getArgumentCompletions: input => {
-      const loader = /^(stats|plan)(?:\s|$)/i.test(input.trimStart()) ? loadReportProjects : loadProjects
+      const loader = /^(review|stats|plan)(?:\s|$)/i.test(input.trimStart()) ? loadReportProjects : loadProjects
       return ompWorklogArgumentCompletions(input, loader(projectTimeLogPath))
     },
     handler: async (args, ctx) => {
