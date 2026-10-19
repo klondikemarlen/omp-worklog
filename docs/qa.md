@@ -7,7 +7,7 @@ The current behavior is covered by focused tests in the repository:
 | Behavior | Evidence location |
 | --- | --- |
 | Project Time evidence parsing, filtering, grouping, mappings, drafts, and compact timesheet formatting | `test/project-time.test.js` |
-| OMP command parsing, completions, read-only draft tools, write approval, and interactive summary lifecycle | `test/omp-plugin.test.js` |
+| OMP command parsing, completions, host-resolved settings and option precedence, read-only draft tools, write approval, and interactive summary lifecycle | `test/omp-plugin.test.js` |
 | Harvest destination adapter validation and write behavior | `test_omp_worklog.rb` |
 | Installed revision rejection, user-setting preservation, export failure safety, and private recovery snapshots | `test/release-plugin.test.js` |
 
@@ -37,7 +37,7 @@ For evidence or completion changes, also exercise the actual reader/transform wi
 
 Use valid leap dates and invalid calendar endpoints when changing date-range validation. Preserve local-day splitting and source-kind separation; do not treat summed overlapping intervals as billable time.
 
-The extension factory can be probed in a fresh OMP process with a temporary explicit extension and discovery disabled. Check capability names and option keys only, not private configuration values. Confirm a supported host settings API before implementing configuration work; an internal resolver or a manifest declaration alone is not that proof.
+For settings changes, exercise the supported host CLI from the intended project cwd, then verify both a saved user mapping and a different project override in separate fresh OMP processes. Explicit factory options must override resolved values, but an injected loader or explicit mapping alone cannot prove host scope resolution. Capability probes and public reports must omit private setting values.
 
 Permanent regressions should verify consumer-visible data or transitions. Remove obsolete expectations that pin data loss or incidental implementation behavior rather than preserving them as policy. Keep temporary probes and private calibration snapshots out of the repository.
 

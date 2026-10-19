@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { DatabaseSync } from "node:sqlite"
@@ -330,7 +330,7 @@ test("when registering the OMP extension, it exposes a deterministic no-write dr
   const summaryPlans = []
   let failSummary = false
   // Act
-  ompWorklogExtension({
+  await ompWorklogExtension({
     zod: { z },
     registerTool(tool) { tools.push(tool) },
     registerCommand(name, command) { commands.push({ name, command }) },
@@ -488,4 +488,71 @@ test("when registering the OMP extension, it exposes a deterministic no-write dr
     ],
   )
   assert.deepEqual(tools.filter(tool => tool.approval === "write").map(tool => tool.name), ["omp_worklog_record_time_off"])
+})
+
+test("when host settings resolve, the timesheet uses the persisted destination", async t => {
+  // Arrange
+  const directory = mkdtempSync(join(tmpdir(), "worklog-settings-"))
+  t.after(() => rmSync(directory, { recursive: true, force: true }))
+  const logPath = join(directory, "evidence.json")
+  const startAtMs = new Date(2026, 9, 19, 9).getTime()
+  writeFileSync(logPath, JSON.stringify({
+    format: "omp-project-time/evidence",
+    version: 1,
+    entries: [{ project: "Demo", sourceKind: "human_active", startAtMs, endAtMs: startAtMs + 60_000 }],
+  }))
+  const messages = []
+  let command
+
+  // Act
+  await ompWorklogExtension({
+    cwd: directory,
+    zod: { z },
+    registerTool() {},
+    registerCommand(_name, definition) { command = definition },
+    sendMessage(message) { messages.push(message) },
+  }, {
+    projectTimeLogPath: logPath,
+    loadPluginSettings: async () => ({
+      projectTimeMappings: '{"Demo":{"project":"Internal","task":"Development"}}',
+    }),
+  })
+  await command.handler("timesheet 2026-10-19", { ui: { notify: message => assert.fail(message) } })
+
+  // Assert
+  assert.equal(messages[0].content, "Timesheet totals (review only)\nDate: 2026-10-19\nProject: Demo\nDuration: 0:01\nHarvest: Internal / Development")
+})
+
+test("when factory options override host settings, the timesheet uses the explicit destination", async t => {
+  // Arrange
+  const directory = mkdtempSync(join(tmpdir(), "worklog-settings-"))
+  t.after(() => rmSync(directory, { recursive: true, force: true }))
+  const logPath = join(directory, "evidence.json")
+  const startAtMs = new Date(2026, 9, 19, 9).getTime()
+  writeFileSync(logPath, JSON.stringify({
+    format: "omp-project-time/evidence",
+    version: 1,
+    entries: [{ project: "Demo", sourceKind: "human_active", startAtMs, endAtMs: startAtMs + 60_000 }],
+  }))
+  const messages = []
+  let command
+
+  // Act
+  await ompWorklogExtension({
+    cwd: directory,
+    zod: { z },
+    registerTool() {},
+    registerCommand(_name, definition) { command = definition },
+    sendMessage(message) { messages.push(message) },
+  }, {
+    projectTimeLogPath: logPath,
+    projectTimeMappings: '{"Demo":{"project":"Explicit Destination","task":"Review"}}',
+    loadPluginSettings: async () => ({
+      projectTimeMappings: '{"Demo":{"project":"Internal","task":"Development"}}',
+    }),
+  })
+  await command.handler("timesheet 2026-10-19", { ui: { notify: message => assert.fail(message) } })
+
+  // Assert
+  assert.equal(messages[0].content, "Timesheet totals (review only)\nDate: 2026-10-19\nProject: Demo\nDuration: 0:01\nHarvest: Explicit Destination / Review")
 })

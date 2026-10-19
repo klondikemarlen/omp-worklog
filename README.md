@@ -81,7 +81,7 @@ Type `/worklog ` in OMP to discover `timesheet`; date aliases appear after selec
 
 ## OMP settings
 
-The manifest declares the following settings. **Persisted settings are currently inactive in the extension**: OMP does not expose resolved user-plus-project plugin settings at factory initialization. Explicit factory options work for programmatic callers and tests. [Issue #134](https://github.com/klondikemarlen/omp-worklog/issues/134) tracks the host dependency; do not assume a successful `omp plugin config set` changed runtime behavior.
+Worklog resolves persisted user settings and project overrides through the supported `omp plugin config list omp-worklog --json` command at initialization, using the OMP project cwd. Project values override user values; explicit factory options override both for programmatic callers and tests. Resolution runs once before commands and tools register; restart or reload the extension after changing settings. A resolution failure reports a diagnostic instead of silently using the wrong destination.
 
 - `defaultHours`: hours per business day when a time-off tool call omits `hours`; defaults to `7`.
 - `holidayRegions`: comma-separated Holidays regions; defaults to `ca_yt`.
@@ -121,6 +121,11 @@ Version `0.14.0` is a clean identity cutover. Uninstall the retired `harvest-wor
 
 Version `0.14.3` renames the OMP slash command from `/omp-worklog` to `/worklog`; the `omp-worklog` package identity and CLI executable are unchanged.
 
+## Changes in 0.14.6
+
+- Activate persisted settings through the supported host CLI before registering commands, completion, and tools.
+- Honor project override precedence and retain explicit factory-option overrides without parsing host configuration files.
+
 ## Changes in 0.14.5
 
 - Preserve saved user settings across the required clean plugin reinstall, without copying project overrides or manifest defaults into user configuration.
@@ -155,4 +160,4 @@ omp-worklog --help
 
 The release wrapper exports explicit user settings through OMP's configuration CLI from an isolated temporary directory before uninstalling. It saves `settings.json` in an owner-only recovery directory, prints that path without values, restores settings through the CLI, and verifies equality after installation. Project overrides remain project-scoped; unset defaults stay unset. Keep the reported backup until the release is confirmed. If installation or restoration fails, recover from that private snapshot after resolving the reported phase; do not paste its contents into an issue.
 
-After installation, start a new OMP process and exercise `/worklog` completion and a timesheet against synthetic local evidence. Verify that a newly committed SQLite project appears without restarting that process. Existing sessions retain startup-loaded extension code and cannot prove the released artifact. Use explicit factory options for a mapped smoke until #134 is resolved; do not claim persisted-setting activation from that smoke.
+After installation, start a new OMP process and exercise `/worklog` completion and a timesheet against synthetic local evidence. Verify that a newly committed SQLite project appears without restarting that process. Existing sessions retain startup-loaded extension code and cannot prove the released artifact. Verify a persisted user mapping and then a different project override; an explicit factory-option smoke alone does not prove saved configuration activation.
