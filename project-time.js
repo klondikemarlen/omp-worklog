@@ -8,7 +8,7 @@ const HOUR_MS = 60 * 60 * 1000
 const PROJECT_TIME_EVIDENCE_FORMAT = "omp-project-time/evidence"
 const PROJECT_TIME_EVIDENCE_VERSION = 1
 
-function projectTimeEvidenceEntries(state) {
+export function projectTimeEvidenceEntries(state) {
   if (!state || typeof state !== "object" || Array.isArray(state) || !Array.isArray(state.entries)) {
     throw new Error("OMP Project Time evidence must include an entries array")
   }
@@ -95,9 +95,11 @@ export function parseProjectTimeMappings(value) {
 }
 
 
-export function projectTimeProjectNames(state) {
+export function projectTimeProjectNames(state, { includeAgentTurns = false } = {}) {
   return [...new Set(projectTimeEvidenceEntries(state)
-    .filter(session => session?.sourceKind === "human_active" && typeof session.project === "string" && session.project.trim().length > 0)
+    .filter(session =>
+      (session?.sourceKind === "human_active" || (includeAgentTurns && session?.sourceKind === "agent_turn_elapsed")) &&
+      typeof session.project === "string" && session.project.trim().length > 0)
     .map(session => session.project))]
     .sort((left, right) => left.localeCompare(right))
 }
@@ -519,6 +521,7 @@ function timesheetDestination(group, mappings) {
 function projectTimeEvidenceSegment(session, spentDate, segmentStartAtMs, segmentEndAtMs) {
   return {
     id: session.id,
+    ...(session.sessionId === undefined ? {} : { sessionId: session.sessionId }),
     spentDate,
     sourceKind: session.sourceKind,
     project: session.project,

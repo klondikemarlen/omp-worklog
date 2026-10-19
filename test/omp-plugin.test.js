@@ -215,7 +215,7 @@ test("when completing timesheet arguments, it suggests contextual values", () =>
   ]
 
   // Assert
-  assert.deepEqual(root.map(item => item.value), ["timesheet", "help"])
+  assert.deepEqual(root.map(item => item.value), ["timesheet", "stats", "plan", "submit", "help"])
   assert.deepEqual(prefix.map(item => item.value), ["timesheet"])
   assert.deepEqual(dates.slice(0, 2).map(item => item.value), ["timesheet today", "timesheet yesterday"])
   assert.match(dates[2].value, /^timesheet \d{4}-\d{2}-\d{2}$/)
@@ -479,15 +479,11 @@ test("when registering the OMP extension, it exposes a deterministic no-write dr
   })
   await command.handler("time-off --help", { cwd: "/tmp", ui })
   assert.equal(messages.length, 7)
-  assert.deepEqual(
-    tools.map(tool => tool.name),
-    [
-      "omp_worklog_record_time_off",
-      "omp_worklog_preview_project_time_drafts",
-      "omp_worklog_preview_project_time_transforms",
-    ],
-  )
-  assert.deepEqual(tools.filter(tool => tool.approval === "write").map(tool => tool.name), ["omp_worklog_record_time_off"])
+  assert.deepEqual(tools.filter(tool => tool.approval === "write").map(tool => tool.name), [
+    "omp_worklog_record_time_off",
+    "omp_worklog_prepare_review_batch",
+    "omp_worklog_submit_reviewed_batch",
+  ])
 })
 
 test("when host settings resolve, the timesheet uses the persisted destination", async t => {

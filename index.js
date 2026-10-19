@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process"
 import { readFileSync, statSync } from "node:fs"
+
 import {
   defaultProjectTimeLogPath,
   formatProjectTimeCommandSummary,
@@ -12,6 +13,7 @@ import {
   readProjectTimeState,
   resolveProjectTimeDate,
 } from "./project-time.js"
+import { createWorklogTools, runWorklogAction } from "./worklog-workflow.js"
 
 function normalizeHolidayRegions(regions) {
   return [...new Set(regions.map(region => region.trim().toLowerCase()).filter(Boolean))]
@@ -59,9 +61,9 @@ export function timeOffArguments({
   return args
 }
 
-export function runCommand(command, args, { cwd, signal } = {}) {
+export function runCommand(command, args, { cwd, signal, input } = {}) {
   return new Promise(resolve => {
-    const child = spawn(command, args, { cwd, env: process.env, stdio: ["ignore", "pipe", "pipe"] })
+    const child = spawn(command, args, { cwd, env: process.env, stdio: [input === undefined ? "ignore" : "pipe", "pipe", "pipe"] })
     let stdout = ""
     let stderr = ""
     let finished = false
@@ -78,6 +80,15 @@ export function runCommand(command, args, { cwd, signal } = {}) {
     child.once("error", error => finish(null, error))
     child.once("close", code => finish(code))
     signal?.addEventListener("abort", abort, { once: true })
+    if (input !== undefined) {
+      child.stdin.on("error", error => {
+        if (error.code === "EPIPE") return
+
+        child.kill("SIGTERM")
+        finish(null, error)
+      })
+      child.stdin.end(input)
+    }
   })
 }
 
@@ -226,8 +237,12 @@ const WORKLOG_COMMAND = "worklog"
 const OMP_WORKLOG_USAGE = [
   "Usage:",
   `  /${WORKLOG_COMMAND} timesheet DATE [--project PROJECT]`,
+  `  /${WORKLOG_COMMAND} stats FROM [TO] [--project PROJECT] [--until HH:MM]`,
+  `  /${WORKLOG_COMMAND} plan DATE [--project PROJECT] [--until HH:MM]`,
+  `  /${WORKLOG_COMMAND} submit BATCH_PATH [--dry-run]`,
   "",
-  "DATE: today, yesterday, or YYYY-MM-DD",
+  "Dates: today, yesterday, or YYYY-MM-DD. --until clips only the final day.",
+  "Plans require reviewed notes/durations and one explicit approval before filing.",
 ].join("\n")
 
 const DATE_COMPLETIONS = [
@@ -251,39 +266,63 @@ const TIMESHEET_FLAGS = {
 export function ompWorklogArgumentCompletions(argumentPrefix, projects = []) {
   const input = argumentPrefix
   const trimmed = input.trim()
-
-
-  if (!trimmed || !input.includes(" ")) {
-    const choices = [
-      { label: "timesheet", value: "timesheet", description: "Build a reviewable daily timesheet from local Project Time" },
-      { label: "help", value: "help", description: "Show the timesheet command form and date options" },
-    ]
-    return choices.filter(choice => choice.value.startsWith(trimmed.toLowerCase()))
-  }
+  const choices = [
+    { label: "timesheet", value: "timesheet", description: "Review compact human-active totals" },
+    { label: "stats", value: "stats", description: "Compare daily human and AI timings by project" },
+    { label: "plan", value: "plan", description: "Prepare a private concurrent-work review batch" },
+    { label: "submit", value: "submit", description: "Approve and file a reviewed batch, or preflight it" },
+    { label: "help", value: "help", description: "Show Worklog commands" },
+  ]
+  if (!trimmed || !input.includes(" ")) return choices.filter(choice => choice.value.startsWith(trimmed.toLowerCase()))
 
   const first = trimmed.split(/\s+/, 1)[0].toLowerCase()
-  if (first !== "timesheet") return null
-
   const words = trimmed.split(/\s+/)
   if (words.some(word => ["--help", "-h"].includes(word))) return null
+  if (first === "submit") {
+    const parsed = parseCommandArguments(input)
+    if (!parsed?.[1] || parsed[1].startsWith("--")) return null
+
+    return completionForFlag(input, { "--dry-run": "Preflight without creating Harvest entries", "--help": "Show command help" })
+  }
+  if (!["timesheet", "stats", "plan"].includes(first)) return null
+
   const optionIndex = words.findIndex((word, index) => index > 0 && word.startsWith("--"))
   const positionals = words.slice(1, optionIndex === -1 ? words.length : optionIndex)
-  if (optionIndex === -1 && (positionals.length < 1 || (!input.endsWith(" ") && positionals.length === 1))) {
-    const partial = input.endsWith(" ") ? "" : positionals.at(-1) ?? ""
+  const maximumDates = first === "stats" ? 2 : 1
+  if (optionIndex === -1 && (!positionals.length || (!input.endsWith(" ") && positionals.length <= maximumDates))) {
+    const partial = input.endsWith(" ") ? "" : positionals.at(-1)
     const base = [first, ...positionals.slice(0, input.endsWith(" ") ? positionals.length : -1)]
     return dateCompletions()
       .filter(choice => choice.value.startsWith(partial.toLowerCase()))
       .map(choice => ({ ...choice, value: [...base, choice.value].join(" ") }))
   }
+  if (!positionals.length || positionals.length > maximumDates || positionals.some(value => !DATE_PATTERN.test(value))) return null
 
-  if (positionals.length !== 1 || !DATE_PATTERN.test(positionals[0])) return null
   const projectCompletions = completionForProject(input, projects)
   if (projectCompletions) return projectCompletions
+  if (first !== "timesheet") {
+    const until = /(?:^|\s)--until(?:\s|$)/.exec(input)
+    if (until) {
+      const entered = input.slice(until.index + until[0].length).trim()
+      if (!entered.includes(" ") && !(input.endsWith(" ") && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(entered))) {
+        const base = input.slice(0, until.index + until[0].length).trimEnd()
+        return ["12:00", "17:00"].filter(value => value.startsWith(entered))
+          .map(value => ({ label: value, value: `${base} ${value}`, description: "Local cutoff on the final day" }))
+      }
+    }
+  }
 
-  const flags = !words.includes("--project")
-    ? TIMESHEET_FLAGS
-    : { "--help": TIMESHEET_FLAGS["--help"] }
-  return completionForFlag(input, flags)
+  const flags = first === "timesheet" ? TIMESHEET_FLAGS : {
+    "--project": "Exact local Project Time project",
+    "--until": "Local HH:MM cutoff on the final day",
+    "--help": "Show command help",
+  }
+  const flagChoices = completionForFlag(input, flags)
+  if (first === "stats" && optionIndex === -1 && positionals.length === 1 && input.endsWith(" ")) {
+    const dates = dateCompletions().map(choice => ({ ...choice, value: `${trimmed} ${choice.value}` }))
+    return [...dates, ...(flagChoices || [])]
+  }
+  return flagChoices
 }
 
 function completionForFlag(input, flags) {
@@ -308,7 +347,9 @@ function completionForProject(input, projects) {
   const valueStart = (match.index ?? 0) + match[0].length
   const entered = input.slice(valueStart)
   if (/\s--/.test(entered)) return null
-  const completedProject = parseCommandArguments(input)?.[3]
+  const parsed = parseCommandArguments(input)
+  const projectIndex = parsed?.indexOf("--project") ?? -1
+  const completedProject = projectIndex === -1 ? undefined : parsed[projectIndex + 1]
   if (input.endsWith(" ") && projects.includes(completedProject)) return null
 
   const prefix = entered.trim().replace(/^['"]/, "")
@@ -323,7 +364,7 @@ function completionForProject(input, projects) {
   return choices.length > 0 ? choices : null
 }
 
-export function createProjectTimeProjectNamesLoader({ read = readFileSync, stat = statSync } = {}) {
+export function createProjectTimeProjectNamesLoader({ read = readFileSync, stat = statSync, includeAgentTurns = false } = {}) {
   let cachedPath
   let cachedStamp
   let cachedProjects = []
@@ -344,7 +385,7 @@ export function createProjectTimeProjectNamesLoader({ read = readFileSync, stat 
       }
       if (cachedPath === path && cachedStamp === stamp) return cachedProjects
 
-      cachedProjects = projectTimeProjectNames(readProjectTimeState(path, { read }))
+      cachedProjects = projectTimeProjectNames(readProjectTimeState(path, { read }), { includeAgentTurns })
       cachedPath = path
       cachedStamp = stamp
       return cachedProjects
@@ -396,14 +437,31 @@ export function parseCommandArguments(input) {
   return words
 }
 
-function isTimesheetForm(words, allowIncomplete = false) {
-  if (words[0] !== "timesheet") return false
+function isWorklogForm(words, allowIncomplete = false) {
+  const command = words[0]
+  if (!["timesheet", "stats", "plan", "submit"].includes(command)) return false
   if (allowIncomplete && words.length === 1) return true
-  if (!DATE_PATTERN.test(words[1])) return false
-  if (allowIncomplete && words.length === 2) return true
-  if (words.length === 2) return true
-  if (words[2] !== "--project" || !words[3] || words[3].startsWith("--")) return false
-  return words.length === 4
+  if (command === "submit") {
+    return Boolean(words[1]) && !words[1].startsWith("--") &&
+      (words.length === 2 || (words.length === 3 && words[2] === "--dry-run"))
+  }
+
+  const optionIndex = words.findIndex((word, index) => index > 0 && word.startsWith("--"))
+  const dates = words.slice(1, optionIndex === -1 ? undefined : optionIndex)
+  if (!dates.length || dates.length > (command === "stats" ? 2 : 1) || dates.some(date => !DATE_PATTERN.test(date))) return false
+  if (optionIndex === -1) return true
+
+  const seen = new Set()
+  for (let index = optionIndex; index < words.length; index += 2) {
+    const flag = words[index]
+    const value = words[index + 1]
+    if (seen.has(flag) || !value || value.startsWith("--")) return false
+    if (flag !== "--project" && !(flag === "--until" && command !== "timesheet")) return false
+    if (flag === "--until" && !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value)) return false
+
+    seen.add(flag)
+  }
+  return true
 }
 
 export function parseOmpWorklogArguments(args) {
@@ -414,7 +472,7 @@ export function parseOmpWorklogArguments(args) {
   if (!words || words.length === 0) return null
   const help = ["--help", "-h"].includes(words.at(-1))
   const form = help ? words.slice(0, -1) : words
-  if (!isTimesheetForm(form, help)) return null
+  if (!isWorklogForm(form, help)) return null
   return help ? { help: true } : { argv: words }
 }
 
@@ -488,10 +546,22 @@ export default async function ompWorklogExtension(pi, options = {}) {
   const projectTimeLogPath = options.projectTimeLogPath?.trim() || ""
   const loadTransform = options.loadProjectTimeTransform ?? loadProjectTimeTransform
   const loadProjects = options.loadProjectTimeProjectNames ?? createProjectTimeProjectNamesLoader()
+  const loadReportProjects = options.loadProjectTimeProjectNames ?? createProjectTimeProjectNamesLoader({ includeAgentTurns: true })
   const completeSummary = options.completeProjectTimeSummary ?? completeProjectTimeSummary
+  const workflowOptions = {
+    command,
+    projectTimeMappings,
+    projectTimeLogPath,
+    responseGraceMinutes: options.responseGraceMinutes ?? 5,
+    dataDirectory: options.worklogDataDirectory,
+    run: options.runWorklogCommand ?? runCommand,
+  }
   pi.registerCommand(WORKLOG_COMMAND, {
-    description: "Build a review-only multi-project timesheet from local OMP Project Time",
-    getArgumentCompletions: input => ompWorklogArgumentCompletions(input, loadProjects(projectTimeLogPath)),
+    description: "Review human/AI evidence, prepare concurrent worklogs, and file approved batches",
+    getArgumentCompletions: input => {
+      const loader = /^(stats|plan)(?:\s|$)/i.test(input.trimStart()) ? loadReportProjects : loadProjects
+      return ompWorklogArgumentCompletions(input, loader(projectTimeLogPath))
+    },
     handler: async (args, ctx) => {
       const parsed = parseOmpWorklogArguments(args)
       if (!parsed || parsed.help) {
@@ -500,6 +570,17 @@ export default async function ompWorklogExtension(pi, options = {}) {
       }
 
       try {
+        if (parsed.argv[0] !== "timesheet") {
+          const outcome = await runWorklogAction(parsed.argv, ctx, workflowOptions)
+          pi.sendMessage({
+            customType: "omp-worklog-workflow",
+            content: outcome.content,
+            display: true,
+            attribution: "assistant",
+          }, { triggerTurn: false })
+          return
+        }
+
         const spentDate = resolveProjectTimeDate(parsed.argv[1])
         const project = parsed.argv[2] === "--project" ? parsed.argv[3] : undefined
         const mappings = parseProjectTimeMappings(projectTimeMappings)
@@ -520,7 +601,7 @@ export default async function ompWorklogExtension(pi, options = {}) {
         }, { triggerTurn: false })
         await requestProjectTimeSummary(pi, ctx, plan, completeSummary)
       } catch (error) {
-        ctx.ui.notify(`Could not read OMP Project Time: ${error.message}`, "error")
+        ctx.ui.notify(`Could not complete Worklog command: ${error.message}`, "error")
       }
     },
   })
@@ -537,4 +618,5 @@ export default async function ompWorklogExtension(pi, options = {}) {
     projectTimeMappings,
     projectTimeLogPath,
   }))
+  for (const tool of createWorklogTools(pi.zod.z, workflowOptions)) pi.registerTool(tool)
 }
