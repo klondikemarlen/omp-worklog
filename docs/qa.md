@@ -12,6 +12,7 @@ The current behavior is covered by focused tests in the repository:
 | Installed revision rejection, user-setting preservation, export failure safety, and private recovery snapshots | `test/release-plugin.test.js` |
 | Daily human/AI reports, within-project deduplication, cross-project concurrency, response grace, cutoff, and review candidates | `test/project-time-report.test.js` |
 | Private unapproved batches, approval rejection, headless safety, and new command completion | `test/worklog-workflow.test.js` |
+| Native daily review edits, readiness, exclusion, cancellation, and exact duration boundaries | `test/daily-review.test.js` |
 | Reviewed-batch preflight, provider scoping/pagination, idempotency, and uncertain/partial recovery | `test_batch_cli.rb` |
 
 Run the relevant JavaScript suite with:
@@ -45,6 +46,8 @@ For settings changes, exercise the supported host CLI from the intended project 
 Permanent regressions should verify consumer-visible data or transitions. Remove obsolete expectations that pin data loss or incidental implementation behavior rather than preserving them as policy. Keep temporary probes and private calibration snapshots out of the repository.
 
 For batch changes, exercise the real Ruby client transport against a disposable local HTTP server with synthetic credentials and records. Prove a dry run performs no create, two concurrent approved projects both file, a repeated identity reconciles without duplication, and a later failure leaves truthful partial/uncertain state. A fake exposing invented client methods is not transport proof. Never use actual historical Harvest writes as release QA.
+
+For daily-review changes, launch a fresh interactive OMP process with synthetic local evidence. Exercise `/worklog review`, edit a duration and factual note using the native editor, mark the entry reviewed, exclude another project, and choose Submit. Observe the actual dialogs and final filing result; an injected provider boundary is UI evidence only, not real Harvest transport proof. Also cancel a review and verify that its private draft resumes without provider calls. Keep QA credentials/data synthetic and never submit a production workday as validation.
 
 ## Documentation Verification
 

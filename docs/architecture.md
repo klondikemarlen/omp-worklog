@@ -26,6 +26,7 @@ Private review batches persist candidate and reviewer-adjusted durations outside
 | `index.js` | OMP command, completion, tool registration, interactive summary lifecycle, and CLI invocation | Source comments and `test/omp-plugin.test.js` |
 | `project-time-report.js` | Source-separated daily analytics, same-session gap inference, independent project candidates, and review-batch records | `test/project-time-report.test.js` |
 | `worklog-workflow.js` | Private batch preparation, OMP review/approval orchestration, and structured CLI submission | `test/worklog-workflow.test.js` |
+| `daily-review.js` | Native daily review interactions, edit/review invalidation, exclusion, and submission readiness | `test/daily-review.test.js` |
 | `lib/omp_worklog.rb` and `lib/omp_worklog/work_entry_cli.rb` | Harvest CLI validation and writes | Source comments and `test_omp_worklog.rb` |
 | `lib/omp_worklog/batch_cli.rb` | Reviewed-batch validation, provider preflight/filing, and recovery receipts | `test_batch_cli.rb` |
 | `package.json` and gemspec | Published package metadata and included artifacts | Manifest files |
