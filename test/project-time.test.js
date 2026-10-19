@@ -58,6 +58,85 @@ test("when resolving a local date, it resolves relative dates and rejects invali
   assert.throws(parseInvalidDate, /valid local date/)
 })
 
+test("when a transform range contains an impossible date, it rejects either endpoint", () => {
+  // Arrange
+  const state = evidenceState([])
+  const ranges = [
+    { from: "2026-02-31", to: "2026-03-01" },
+    { from: "2026-02-01", to: "2026-02-31" },
+    { from: "2025-02-29", to: "2025-03-01" },
+  ]
+
+  // Act / Assert
+  for (const range of ranges) {
+    assert.throws(() => projectTimeTransform(state, new Map(), range), /valid local date/)
+  }
+})
+
+test("when a valid leap day is selected, it retains that day's evidence", () => {
+  // Arrange
+  const startAtMs = new Date(2024, 1, 29, 9).getTime()
+  const state = evidenceState([{
+    project: "Demo",
+    sourceKind: "human_active",
+    startAtMs,
+    endAtMs: startAtMs + 60_000,
+  }])
+
+  // Act
+  const plan = projectTimeTransform(state, new Map(), { from: "2024-02-29", to: "2024-02-29" })
+
+  // Assert
+  assert.equal(plan.groups[0].spentDate, "2024-02-29")
+  assert.equal(plan.groups[0].milliseconds, 60_000)
+})
+
+test("when a mapped interval rounds to zero hours, its exact duration remains in the draft", () => {
+  // Arrange
+  const startAtMs = new Date(2026, 9, 19, 9).getTime()
+  const state = evidenceState([{
+    project: "Demo",
+    sourceKind: "human_active",
+    startAtMs,
+    endAtMs: startAtMs + 10_000,
+  }])
+  const mappings = parseProjectTimeMappings({ Demo: { project: "Internal", task: "Development" } })
+
+  // Act
+  const plan = projectTimeTransform(state, mappings, {
+    from: "2026-10-19",
+    to: "2026-10-19",
+    applyMappings: true,
+  })
+
+  // Assert
+  assert.equal(plan.entries[0].project, "Internal")
+  assert.equal(plan.entries[0].milliseconds, 10_000)
+  assert.match(formatProjectTimeEntryDrafts(plan), /Duration: 0:00:10\n/)
+})
+
+test("when an unmapped interval lasts one millisecond, it remains available for review", () => {
+  // Arrange
+  const startAtMs = new Date(2026, 9, 19, 9).getTime()
+  const state = evidenceState([{
+    project: "Demo",
+    sourceKind: "human_active",
+    startAtMs,
+    endAtMs: startAtMs + 1,
+  }])
+
+  // Act
+  const plan = projectTimeTransform(state, new Map(), {
+    from: "2026-10-19",
+    to: "2026-10-19",
+    applyMappings: true,
+  })
+
+  // Assert
+  assert.equal(plan.entries[0].task, "Review destination")
+  assert.equal(plan.entries[0].milliseconds, 1)
+  assert.match(formatProjectTimeEntryDrafts(plan), /Duration: 0:00:00\.001\n/)
+})
 
 test("when evidence has human-active projects, it returns distinct project names", () => {
   // Arrange
@@ -369,26 +448,4 @@ test("when previewing JSON transforms, it returns data without writing activity 
   assert.equal(preview.approval, "read")
   assert.deepEqual(JSON.parse(previewResult.content[0].text), plan)
   assert.equal(previewCalls[0].applyMappings, true)
-})
-
-test("when an activity duration rounds to zero, it does not create a destination entry", () => {
-  // Arrange
-  const startAtMs = new Date(2026, 6, 17, 9).getTime()
-  // Act
-  const plan = projectTimeTransform(
-    evidenceState([{
-      project: "Harvest API",
-      repositoryId: "repo",
-      sourceKind: "human_active",
-      activity: "implementation",
-      startAtMs,
-      endAtMs: startAtMs + 10_000,
-    }]),
-    parseProjectTimeMappings({ "Harvest API": { project: "Internal", task: "Development" } }),
-    { from: "2026-07-17", to: "2026-07-17", applyMappings: true },
-  )
-
-  // Assert
-  assert.equal(plan.groups[0].hours, 0)
-  assert.deepEqual(plan.entries, [])
 })

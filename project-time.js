@@ -119,6 +119,8 @@ export function projectTimeTransform(
   if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || to < from) {
     throw new Error("from and to must be an inclusive ISO date range")
   }
+  resolveProjectTimeDate(from)
+  resolveProjectTimeDate(to)
 
   const grouped = new Map()
 
@@ -481,7 +483,7 @@ function timesheetEntries(groups, mappings) {
       hours: displayHours(entry.milliseconds),
       sources: entry.sources.sort(compareEvidenceSources),
     }))
-    .filter(entry => entry.hours > 0)
+    .filter(entry => entry.milliseconds > 0)
     .sort((left, right) => left.spentDate.localeCompare(right.spentDate) || left.project.localeCompare(right.project) || left.task.localeCompare(right.task))
 }
 
