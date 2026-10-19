@@ -77,9 +77,13 @@ User stories:
 
 The observable contract is a deterministic block of at most 22 physical lines followed by a generated section of at most six lines, keeping the complete result within 30 logical lines. Every total stacks date, exact local project, aggregate duration, and configured Harvest project/task or `Review destination` on separate lines. The generated section uses the `AI-generated work summary (review before use)` heading, one to three concise outcome bullets derived from at most eight duration-ranked evidence records, and a clearly review-marked suggested Harvest note. Generated lines are capped at 100 characters with an ellipsis so one verbose model line cannot consume the screen. In interactive mode, one keyed OMP widget is updated from the generation state to final content; print and RPC modes retain a normal transcript message. The command remains review-only and never writes Harvest.
 
-Type `/worklog ` to discover timesheet, stats, plan, and submit. Date aliases are completed contextually. After `--project`, timesheet completion lists human-active projects; stats and plan also include agent-only projects. Completion preserves exact local project names.
+Type `/worklog ` to discover review, timesheet, stats, plan, and submit. Date aliases are completed contextually. After `--project`, timesheet completion lists human-active projects; review, stats, and plan also include agent-only projects. Completion preserves exact local project names.
 
 ### Daily Human and AI Reports and Reviewed Batches
+
+At the end of a workday, run `/worklog review`. It opens today's worklog inside OMP: edit each project's duration, destination, and factual note, then choose **Mark reviewed** or **Exclude entry**. When all retained entries are ready, choose **Submit to Harvest** once. No JSON editing or path copying is required. Use `/worklog review yesterday` for another day.
+
+**Save and close** preserves your private draft for the next run. **Refresh evidence** rebuilds the snapshot after confirmation and retains the prior draft privately. Review does not submit anything until you explicitly choose Submit.
 
 ```text
 /worklog stats 2026-10-05 2026-10-18
@@ -133,6 +137,12 @@ For independent comparison with manually recorded Harvest entries, follow the [p
 Version `0.14.0` is a clean identity cutover. Uninstall the retired `harvest-worklog` gem and OMP plugin, then install `omp-worklog`; replace former `harvest-worklog` CLI and `/harvest-worklog` command invocations with `omp-worklog` and `/omp-worklog`. The retired package, executable, command, tools, module, and settings aliases are not retained.
 
 Version `0.14.3` renames the OMP slash command from `/omp-worklog` to `/worklog`; the `omp-worklog` package identity and CLI executable are unchanged.
+
+## Changes in 0.16.0
+
+- Review and submit today's worklog inside OMP with `/worklog review [DATE]`.
+- Edit or exclude entries through native dialogs, save/resume private daily drafts, and refresh evidence without losing prior edits.
+- Display readable filing outcomes while retaining the existing batch approval and recovery protections.
 
 ## Changes in 0.15.0
 

@@ -22,6 +22,24 @@ The default response grace is **five minutes**, as selected by the maintainer. A
 
 The legacy `/worklog timesheet DATE` remains a compact human-active-only preview. It does not become an approved billing total when this workflow is enabled.
 
+## End-of-Workday Review
+
+```text
+/worklog review
+/worklog review yesterday
+```
+
+`review` defaults to today and opens native OMP dialogs, not a JSON document. It also accepts an explicit date, optional `--project PROJECT`, and `--until HH:MM`.
+
+1. Select a project to inspect its human/AI observations, candidate duration, destination, factual note, and review status.
+2. Use **Edit duration**, **Edit destination project**, **Edit task**, or **Edit note** as needed. Duration accepts `H:MM[:SS[.sss]]` and must be positive and no greater than the candidate. Use the editor's displayed submit shortcut to save a field; plain Enter may insert a newline.
+3. Choose **Mark reviewed** after checking progress/blockers, the retained duration, destination, and factual note. Any edit clears that review. Choose **Exclude entry** for work that should not be submitted.
+4. Choose **Submit to Harvest** after every retained entry is reviewed. This selection is the batch approval; the existing adapter preflights and files it, then shows per-record results. Merely opening or editing the review never invokes provider filing.
+
+**Save and close**, or cancelling the main list, saves progress without approval. Reopening with the same date and filters resumes that private draft. Drafts are snapshots, not live-running totals: **Refresh evidence** rebuilds from the current ledger and mappings after confirmation, retains the prior draft in a private `previous-*` directory, and requires review again.
+
+Daily drafts live alongside other review batches under `~/.omp/worklog/review-batches/`, with owner-only directories and files. Different project/cutoff filters retain separate drafts. No source evidence is rewritten. Headless callers cannot implicitly approve this interactive flow; use the explicit file-based interfaces below.
+
 ## Prepare and Review a Daily Batch
 
 ```text

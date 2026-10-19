@@ -1,7 +1,9 @@
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs"
+import { createHash, randomUUID } from "node:crypto"
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import path from "node:path"
 
+import { reviewDailyWorklog } from "./daily-review.js"
 import { parseProjectTimeMappings, readProjectTimeState, resolveProjectTimeDate } from "./project-time.js"
 import { createProjectTimeReviewBatch, formatProjectTimeDailyReport, projectTimeDailyReport } from "./project-time-report.js"
 
@@ -18,13 +20,22 @@ export function dailyWorklogReport(params, options = {}) {
   return projectTimeDailyReport(state, evidenceOptions(params, options))
 }
 
-export function prepareWorklogBatch(params, options = {}) {
+function buildWorklogBatch(params, options) {
   const state = readProjectTimeState(options.projectTimeLogPath || undefined)
   const mappings = parseProjectTimeMappings(options.projectTimeMappings || "{}")
-  const batch = createProjectTimeReviewBatch(state, mappings, evidenceOptions(params, options))
+  return createProjectTimeReviewBatch(state, mappings, evidenceOptions(params, options))
+}
+
+function privateReviewDirectory(options) {
   const directory = path.join(worklogDirectory(options), "review-batches")
   mkdirSync(directory, { recursive: true, mode: 0o700 })
   chmodSync(directory, 0o700)
+  return directory
+}
+
+export function prepareWorklogBatch(params, options = {}) {
+  const batch = buildWorklogBatch(params, options)
+  const directory = privateReviewDirectory(options)
   const batchDirectory = mkdtempSync(path.join(directory, "batch-"))
   const batchPath = path.join(batchDirectory, "review.json")
   writeFileSync(batchPath, JSON.stringify(batch, null, 2) + "\n", { mode: 0o600, flag: "wx" })
@@ -113,6 +124,79 @@ function batchReviewText(batch) {
   return lines.join("\n")
 }
 
+function saveReviewBatch(batchPath, batch) {
+  const pending = path.join(path.dirname(batchPath), `.${randomUUID()}.tmp`)
+  try {
+    writeFileSync(pending, JSON.stringify(batch, null, 2) + "\n", { mode: 0o600, flag: "wx" })
+    renameSync(pending, batchPath)
+  } finally {
+    rmSync(pending, { force: true })
+  }
+}
+
+function dailyBatchPath(params, options) {
+  const scope = JSON.stringify([params.project ?? null, params.until ?? null])
+  const suffix = params.project === undefined && params.until === undefined
+    ? ""
+    : `-${createHash("sha256").update(scope).digest("hex").slice(0, 16)}`
+  return path.join(privateReviewDirectory(options), `daily-${params.from}${suffix}.json`)
+}
+
+function filingSummary(submitted, batchPath) {
+  const lines = [`Worklog filing: ${submitted.status}`]
+  if (submitted.reason) lines.push(submitted.reason.replaceAll("_", " "))
+  for (const entry of submitted.results ?? []) {
+    const reason = entry.reason ? ` — ${entry.reason.replaceAll("_", " ")}` : ""
+    lines.push(`${entry.localProject}: ${entry.status.replaceAll("_", " ")}${reason}`)
+  }
+  lines.push(`Private reviewed batch: ${batchPath}`)
+  if (submitted.status !== "complete") {
+    lines.push("Review the reported outcome before trying again; do not bypass uncertain receipts.")
+  }
+  return lines.join("\n")
+}
+
+async function runDailyReview(params, context, options) {
+  if (!context.hasUI || !["select", "editor", "confirm"].every(method => typeof context.ui?.[method] === "function")) {
+    throw new Error("Daily review requires interactive OMP. Use plan and an explicitly approved batch for headless filing.")
+  }
+
+  const batchPath = dailyBatchPath(params, options)
+  let batch = existsSync(batchPath) ? readReviewBatch(batchPath) : buildWorklogBatch(params, options)
+  if (batch.from !== params.from || batch.to !== params.to) {
+    throw new Error("The saved daily draft has a different date; no submission was attempted.")
+  }
+  batch.approved = false
+  saveReviewBatch(batchPath, batch)
+
+  while (true) {
+    const review = await reviewDailyWorklog(batch, context.ui, draft => saveReviewBatch(batchPath, draft))
+    batch = review.batch
+    if (review.action === "refresh") {
+      const refresh = await context.ui.confirm("Refresh worklog evidence?", "Rebuild this daily review from current evidence and mappings? Your previous draft will be retained privately; all new entries require review again.")
+      if (!refresh) continue
+
+      const fresh = buildWorklogBatch(params, options)
+      const previousDirectory = mkdtempSync(path.join(path.dirname(batchPath), "previous-"))
+      saveReviewBatch(path.join(previousDirectory, "review.json"), batch)
+      batch = fresh
+      saveReviewBatch(batchPath, batch)
+      continue
+    }
+    if (review.action !== "submit") {
+      batch.approved = false
+      saveReviewBatch(batchPath, batch)
+      return { content: `Daily worklog saved; nothing submitted.\nPrivate draft: ${batchPath}\nRun /worklog review ${params.from} again with the same filters to resume.`, details: { status: "saved", batchPath } }
+    }
+
+    if (!reviewedEntries(batch)) throw new Error("Complete every retained entry's review before submitting.")
+    batch.approved = true
+    saveReviewBatch(batchPath, batch)
+    const submitted = await submitBatchDocument(batch, { dryRun: false }, options, context)
+    return { content: filingSummary(submitted, batchPath), details: submitted }
+  }
+}
+
 function result(content, details) {
   return { content: [{ type: "text", text: content }], details }
 }
@@ -195,10 +279,11 @@ export async function runWorklogAction(argv, context, options) {
 
   const flagsAt = argv.findIndex(word => word.startsWith("--"))
   const positionals = argv.slice(1, flagsAt === -1 ? undefined : flagsAt)
-  const from = resolveProjectTimeDate(positionals[0])
-  const to = resolveProjectTimeDate(positionals[1] || positionals[0])
+  const from = resolveProjectTimeDate(positionals[0] || (argv[0] === "review" ? "today" : ""))
+  const to = resolveProjectTimeDate(positionals[1] || positionals[0] || from)
   const value = flag => argv.includes(flag) ? argv[argv.indexOf(flag) + 1] : undefined
   const params = { from, to, project: value("--project"), until: value("--until") }
+  if (argv[0] === "review") return runDailyReview(params, context, options)
   if (argv[0] === "stats") {
     const report = dailyWorklogReport(params, options)
     return { content: formatProjectTimeDailyReport(report), details: report }
