@@ -7,7 +7,7 @@ Gem::Specification.new do |spec|
   spec.version = OmpWorklog::VERSION
   spec.authors = ["Marlen Brunner"]
   spec.email = ["klondikemarlen@gmail.com"]
-  spec.summary = "OMP Project Time work logs with an optional manual Harvest destination."
+  spec.summary = "Concurrent-project work logs with reviewed, safe Harvest batch filing."
   spec.homepage = "https://github.com/klondikemarlen/omp-worklog"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.2"
