@@ -10,6 +10,9 @@ The current behavior is covered by focused tests in the repository:
 | OMP command parsing, completions, host-resolved settings and option precedence, read-only draft tools, write approval, and interactive summary lifecycle | `test/omp-plugin.test.js` |
 | Harvest destination adapter validation and write behavior | `test_omp_worklog.rb` |
 | Installed revision rejection, user-setting preservation, export failure safety, and private recovery snapshots | `test/release-plugin.test.js` |
+| Daily human/AI reports, within-project deduplication, cross-project concurrency, response grace, cutoff, and review candidates | `test/project-time-report.test.js` |
+| Private unapproved batches, approval rejection, headless safety, and new command completion | `test/worklog-workflow.test.js` |
+| Reviewed-batch preflight, provider scoping/pagination, idempotency, and uncertain/partial recovery | `test_batch_cli.rb` |
 
 Run the relevant JavaScript suite with:
 
@@ -17,10 +20,10 @@ Run the relevant JavaScript suite with:
 npm test
 ```
 
-Run the Ruby CLI suite with:
+Run both Ruby CLI suites with:
 
 ```bash
-ruby test_omp_worklog.rb
+npm run test:ruby
 ```
 
 For a no-write CLI smoke check, run:
@@ -35,11 +38,13 @@ Run both suites when a change reaches the OMP-to-CLI boundary; otherwise run the
 
 For evidence or completion changes, also exercise the actual reader/transform with a temporary ledger. Use a live SQLite WAL writer for cache changes: warm completion, insert a different project without closing the writer, and verify that the existing loader sees it. A JSON fixture or a new loader cannot prove cache invalidation. For duration changes, include a positive interval below the decimal-hour rounding threshold and inspect its exact draft duration.
 
-Use valid leap dates and invalid calendar endpoints when changing date-range validation. Preserve local-day splitting and source-kind separation; do not treat summed overlapping intervals as billable time.
+Use valid leap dates and invalid calendar endpoints when changing date-range validation. Preserve local-day splitting and source-kind separation. Concurrent different projects are permitted by policy; do not add a global cap or double-count overlapping human/agent evidence within one project. Historical elapsed observations still require progress/blocker review before billing.
 
 For settings changes, exercise the supported host CLI from the intended project cwd, then verify both a saved user mapping and a different project override in separate fresh OMP processes. Explicit factory options must override resolved values, but an injected loader or explicit mapping alone cannot prove host scope resolution. Capability probes and public reports must omit private setting values.
 
 Permanent regressions should verify consumer-visible data or transitions. Remove obsolete expectations that pin data loss or incidental implementation behavior rather than preserving them as policy. Keep temporary probes and private calibration snapshots out of the repository.
+
+For batch changes, exercise the real Ruby client transport against a disposable local HTTP server with synthetic credentials and records. Prove a dry run performs no create, two concurrent approved projects both file, a repeated identity reconciles without duplication, and a later failure leaves truthful partial/uncertain state. A fake exposing invented client methods is not transport proof. Never use actual historical Harvest writes as release QA.
 
 ## Documentation Verification
 

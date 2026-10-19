@@ -10,13 +10,13 @@ OMP Worklog reads persisted OMP Project Time evidence rather than measuring acti
 
 **Status:** Accepted
 
-Project Time-derived output is review-only. Mappings, work-item attribution, and generated summaries can be incomplete or ambiguous, so they do not authorize a Harvest write. Write-capable commands remain explicit and validate their own inputs.
+Unapproved Project Time-derived output is review-only. Mappings, work-item attribution, elapsed intervals, and generated summaries do not authorize a Harvest write. A reviewed batch may be filed after one explicit approval of its exact destinations, durations, and factual notes; subsequent batches do not inherit that approval.
 
 ## D-003: Preserve Local Identity When Mapping Is Incomplete
 
 **Status:** Accepted
 
-When no configured Harvest destination applies—or attribution is ambiguous or unassigned—the result keeps the exact local Project Time project and marks the destination for review. This avoids silently inventing an external assignment.
+When no configured Harvest destination applies, keep the exact local project and require destination review. Attribution-only draft surfaces also keep ambiguous/unassigned work items under the local project. A project-scoped review batch may prefill an explicit project/task mapping despite uncertain work-item context, but the reviewer still confirms its destination and factual note.
 
 ## D-004: Harvest Is a Current Adapter, Not the Canonical Model
 
@@ -41,3 +41,11 @@ Draft inclusion uses raw positive milliseconds. Rounded decimal hours are a disp
 **Status:** Accepted
 
 JavaScript is the OMP integration runtime; Ruby provides the existing standalone Harvest adapter and business-day dependencies. Their boundary separates local evidence analysis from explicit external writes. Consolidation needs a demonstrated benefit and equivalent behavioral proof, not a preference for a single language. See [runtime and language boundaries](/docs/architecture.md#runtime-and-language-boundaries).
+
+## D-008: Concurrent Value Is a Downstream Review Policy
+
+**Status:** Accepted
+
+Concurrent different projects can each retain their full reviewed duration when work provides meaningful value and the user responds before the session becomes dormant. Worklog merges overlap within each project and infers only same-session gaps within the selected five-minute response grace. Raw human and agent streams remain independent observations, not automatic billing claims.
+
+Historical evidence lacks blocker/progress transitions, so a human reviews those conditions before approving a daily batch. Approval leads to automatic filing of that snapshot, not unattended future submission. The evidence collector remains provider-neutral. See [billing policy and review](/docs/billing.md).
