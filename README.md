@@ -1,6 +1,6 @@
 # OMP Worklog
 
-OMP Worklog is a Project Time-driven Ruby CLI and OMP plugin that builds reviewable personal work logs from local evidence. Harvest is currently one manual destination: the only Harvest operations are explicitly requested time-off and ordinary-work writes.
+OMP Worklog is a Project Time-driven Ruby CLI and OMP plugin for reviewed personal work logs. It reports human/AI observations separately, prepares independent concurrent-project candidates, and files a reviewed daily batch to Harvest after explicit approval. Time-off and ordinary-work commands remain available.
 
 ## Documentation
 
@@ -77,7 +77,21 @@ User stories:
 
 The observable contract is a deterministic block of at most 22 physical lines followed by a generated section of at most six lines, keeping the complete result within 30 logical lines. Every total stacks date, exact local project, aggregate duration, and configured Harvest project/task or `Review destination` on separate lines. The generated section uses the `AI-generated work summary (review before use)` heading, one to three concise outcome bullets derived from at most eight duration-ranked evidence records, and a clearly review-marked suggested Harvest note. Generated lines are capped at 100 characters with an ellipsis so one verbose model line cannot consume the screen. In interactive mode, one keyed OMP widget is updated from the generation state to final content; print and RPC modes retain a normal transcript message. The command remains review-only and never writes Harvest.
 
-Type `/worklog ` in OMP to discover `timesheet`; date aliases appear after selecting `timesheet `. After `--project`, Tab lists local human-active Project Time project names. Completion preserves the exact local project name.
+Type `/worklog ` to discover timesheet, stats, plan, and submit. Date aliases are completed contextually. After `--project`, timesheet completion lists human-active projects; stats and plan also include agent-only projects. Completion preserves exact local project names.
+
+### Daily Human and AI Reports and Reviewed Batches
+
+```text
+/worklog stats 2026-10-05 2026-10-18
+/worklog stats today --until 12:00
+/worklog plan yesterday
+/worklog submit "PATH-PRINTED-BY-PLAN" --dry-run
+/worklog submit "PATH-PRINTED-BY-PLAN"
+```
+
+Different projects retain independent candidate durations; overlapping human/agent evidence within one project is counted once. Only same-session gaps within the five-minute response grace may be inferred, and historical progress/blocker state still needs review. Plans are private, unapproved JSON files with required factual notes and reviewer-adjusted durations. The interactive submit asks for one explicit approval, preflights every record, and then files the batch with duplicate and uncertain-outcome protection.
+
+See [reviewed concurrent worklogs](/docs/billing.md) for the policy, review fields, CLI/tool interfaces, private backups, and recovery. Headless callers can use `omp-worklog work-entry-batch [--dry-run]` with a reviewed JSON document on stdin; actual writes require `approved: true`.
 
 ## OMP settings
 
@@ -88,6 +102,7 @@ Worklog resolves persisted user settings and project overrides through the suppo
 - `command`: direct path to the `omp-worklog` executable.
 - `projectTimeLogPath`: optional path to Project Time v1 evidence; defaults to `~/.omp/project-time/time-log.sqlite`. A legacy versioned JSON snapshot is also supported.
 - `projectTimeMappings`: optional JSON mapping of exact local projects to Harvest project/task names; defaults to `{}`.
+- `responseGraceMinutes`: same-session response-gap inference for review candidates; defaults to `5`, with `0` disabling gap inference. This does not certify progress or authorize billing.
 
 The host stores user plugin settings in `~/.omp/plugins/omp-plugins.lock.json` and project overrides in `.omp/plugin-overrides.json`. Back up private configuration outside Git before uninstalling/reinstalling a plugin. Worklog deliberately does not parse these files itself or bypass project precedence.
 
@@ -113,13 +128,17 @@ For independent comparison with manually recorded Harvest entries, follow the [p
 
 `omp_worklog_preview_project_time_transforms` emits deterministic JSON for local raw intervals. It accepts an inclusive date range and optional exact `repositoryId`, `project`, and `sourceKind` filters; each matching interval is split by local date and grouped by activity, with missing labels reported as `unlabelled`. It defaults to `human_active` and returns the effective top-level `sourceKind`; selecting `agent_turn_elapsed` requires an explicit source-kind request. Set `applyMappings` to create configured Harvest destinations or review-required local destinations for every included group. The output reports groups and draft entries; it never writes Harvest.
 
-
-
 ## Migration from Harvest Worklog
 
 Version `0.14.0` is a clean identity cutover. Uninstall the retired `harvest-worklog` gem and OMP plugin, then install `omp-worklog`; replace former `harvest-worklog` CLI and `/harvest-worklog` command invocations with `omp-worklog` and `/omp-worklog`. The retired package, executable, command, tools, module, and settings aliases are not retained.
 
 Version `0.14.3` renames the OMP slash command from `/omp-worklog` to `/worklog`; the `omp-worklog` package identity and CLI executable are unchanged.
+
+## Changes in 0.15.0
+
+- Add daily/project human-active and AI elapsed reports with a final-day cutoff.
+- Prepare private concurrent-project review batches with within-project deduplication and five-minute same-session response grace.
+- File explicitly approved batches with user-scoped preflight, stable identities, private receipts, and safe partial/uncertain-result handling.
 
 ## Changes in 0.14.6
 
@@ -143,7 +162,7 @@ Version `0.14.3` renames the OMP slash command from `/omp-worklog` to `/worklog`
 Before merging a release PR, self-review its complete diff, address every actionable review comment, and rerun focused QA after fixups. Record the review and QA evidence on the PR. Then merge to `main`, build and publish the Ruby gem, install the released OMP plugin from GitHub, and verify it:
 
 ```bash
-ruby test_omp_worklog.rb
+npm run test:ruby
 npm run test:omp
 bin/omp-worklog --help
 VERSION="$(ruby -Ilib -romp_worklog/version -e 'puts OmpWorklog::VERSION')"

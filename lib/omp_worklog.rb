@@ -28,13 +28,15 @@ module OmpWorklog
   class Error < StandardError; end
 
   class CLI
-    def self.run(arguments, output: $stdout, error: $stderr, client: nil)
+    def self.run(arguments, output: $stdout, error: $stderr, client: nil, input: $stdin)
       command, *command_arguments = arguments
       case command
       when "time-off"
         TimeOffCLI.run(command_arguments, output:, error:, client:)
       when "work-entry"
         WorkEntryCLI.run(command_arguments, output:, error:, client:)
+      when "work-entry-batch"
+        BatchCLI.run(command_arguments, input:, output:, error:, client:)
       when "-h", "--help"
         output.puts usage
         0
@@ -42,7 +44,7 @@ module OmpWorklog
         output.puts VERSION
         0
       else
-        error.puts "Error: choose time-off or work-entry"
+        error.puts "Error: choose time-off, work-entry, or work-entry-batch"
         error.puts usage
         1
       end
@@ -55,10 +57,12 @@ module OmpWorklog
           omp-worklog time-off FROM TO --project-id ID --task-id ID [options]
           omp-worklog work-entry DATE --project NAME --task NAME --hours HOURS --notes NOTES [options]
           omp-worklog work-entry DATE --project-id ID --task-id ID --hours HOURS --notes NOTES [options]
+          omp-worklog work-entry-batch [--dry-run] [--state-dir DIR] < review-batch.json
 
         Commands:
-          time-off    Create one entry per local business day in a date range.
-          work-entry  Create one reviewed ordinary-work entry.
+          time-off          Create one entry per local business day in a date range.
+          work-entry        Create one reviewed ordinary-work entry.
+          work-entry-batch  Preflight and submit one approved reviewed batch.
       USAGE
     end
   end
@@ -180,3 +184,4 @@ module OmpWorklog
 end
 
 require "omp_worklog/work_entry_cli"
+require "omp_worklog/batch_cli"

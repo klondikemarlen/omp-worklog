@@ -6,13 +6,14 @@ OMP Worklog converts local OMP Project Time evidence into a human-reviewable rec
 
 ## Current Product
 
-The current package provides three related capabilities:
+The current package provides:
 
-1. A review-only daily timesheet and deterministic draft tools built from `human_active` OMP Project Time evidence.
-2. Configurable mappings from a local Project Time project to a Harvest project and task.
-3. Explicit Harvest writes for time off and ordinary work through the Ruby CLI, plus an approved OMP time-off tool.
+1. A compact human-active-only timesheet plus daily human/AI reports with exact project and local-date boundaries.
+2. Configurable projections from local projects to Harvest destinations.
+3. Private concurrent-project review batches: within-project overlap is merged, cross-project overlap is retained, and inferred response gaps use a five-minute default grace.
+4. Explicit time-off, ordinary-work, and reviewed-batch Harvest writes through the Ruby adapter, with OMP approval surfaces.
 
-Harvest credentials are not required to read local evidence or generate drafts. No Project Time-driven command writes to Harvest automatically.
+Reading evidence and preparing candidates need no Harvest credentials. Batch preflight reads Harvest; submission creates entries only after review and explicit approval. There is no unattended scheduler.
 
 ## Product Direction
 
@@ -24,7 +25,7 @@ Project: task: duration
 
 Each standard record carries a source-side project, reviewable task label, and duration. OMP Project Time is the analytical source. The work-log layer should turn that evidence into clear records without making an external destination part of the canonical record. A Harvest mapping is a downstream projection used when a person deliberately chooses Harvest as the destination.
 
-This direction is compatible with a future integration that writes reviewed entries to Harvest. It also leaves room for another destination without redefining the collected evidence or the review workflow.
+The reviewed-batch integration writes approved records to Harvest without making Harvest the analytical source of truth. Another destination can consume the same review boundary without redefining evidence collection.
 
 ## Experience Rules
 
@@ -33,7 +34,9 @@ This direction is compatible with a future integration that writes reviewed entr
 - Treat generated summaries and destination mappings as review aids, never as factual replacement for evidence or user approval.
 - Require an explicit user action for any external write.
 - Keep the local project/task/duration record useful when no external mapping exists.
+- Support legitimate concurrent-project value without imposing a global wall-clock billing cap.
+- Keep source observations, inferred candidates, and approved durations visibly distinct.
 
 ## Non-goals for the Current Release
 
-The OMP Worklog identity cutover does not alter the Project Time evidence schema, change the existing Harvest write path, add a new destination integration, or publish a documentation site. Those changes need separate compatibility, migration, and release decisions.
+This release does not alter Project Time's evidence schema, reconstruct historical blocker/dormancy state, certify elapsed AI time automatically, submit unattended, or modify existing destination entries. Authoritative prospective blocker evidence is tracked separately in issue #141; the independent private calibration study remains issue #133.
