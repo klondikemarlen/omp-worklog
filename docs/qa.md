@@ -9,7 +9,7 @@ The current behavior is covered by focused tests in the repository:
 | Project Time evidence parsing, filtering, grouping, mappings, drafts, and compact timesheet formatting | `test/project-time.test.js` |
 | OMP command parsing, completions, read-only draft tools, write approval, and interactive summary lifecycle | `test/omp-plugin.test.js` |
 | Harvest destination adapter validation and write behavior | `test_omp_worklog.rb` |
-| Installed plugin revision verification failure behavior | `test/release-plugin.test.js` |
+| Installed revision rejection, user-setting preservation, export failure safety, and private recovery snapshots | `test/release-plugin.test.js` |
 
 Run the relevant JavaScript suite with:
 
@@ -48,3 +48,5 @@ For a documentation change, verify every local Markdown link, then check each im
 ## Release Boundary
 
 Release instructions and installed-plugin verification live in the [repository README](../README.md#release). A documentation-only change does not by itself change the gem or plugin artifact, so it does not require publishing or reinstalling one.
+
+The plugin host deletes saved user settings on uninstall. The release wrapper therefore exports only explicit user values through the supported CLI from an isolated cwd, saves an owner-only recovery snapshot, then restores and verifies values after reinstalling. Release QA must compare saved settings before and after the real clean reinstall; successful installation or passing plugin tests alone cannot prove configuration preservation. Do not promote project overrides or defaults into global settings.

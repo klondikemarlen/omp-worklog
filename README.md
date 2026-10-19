@@ -121,6 +121,11 @@ Version `0.14.0` is a clean identity cutover. Uninstall the retired `harvest-wor
 
 Version `0.14.3` renames the OMP slash command from `/omp-worklog` to `/worklog`; the `omp-worklog` package identity and CLI executable are unchanged.
 
+## Changes in 0.14.5
+
+- Preserve saved user settings across the required clean plugin reinstall, without copying project overrides or manifest defaults into user configuration.
+- Retain an owner-only recovery snapshot and report its path; abort before uninstalling when settings cannot be exported.
+
 ## Changes in 0.14.4
 
 - Preserve short positive durations in mapped and review-required drafts.
@@ -147,5 +152,7 @@ omp-worklog --help
 ```
 
 `npm run release` owns the plugin uninstall/force-install mutation, including removal of the retired plugin when present. `npm run verify:release` never changes the installation: it checks the installed package version, resolved Git revision, and plugin path, then runs the installed JavaScript test suite. It exits after verification; tests alone do not exercise a fresh OMP host.
+
+The release wrapper exports explicit user settings through OMP's configuration CLI from an isolated temporary directory before uninstalling. It saves `settings.json` in an owner-only recovery directory, prints that path without values, restores settings through the CLI, and verifies equality after installation. Project overrides remain project-scoped; unset defaults stay unset. Keep the reported backup until the release is confirmed. If installation or restoration fails, recover from that private snapshot after resolving the reported phase; do not paste its contents into an issue.
 
 After installation, start a new OMP process and exercise `/worklog` completion and a timesheet against synthetic local evidence. Verify that a newly committed SQLite project appears without restarting that process. Existing sessions retain startup-loaded extension code and cannot prove the released artifact. Use explicit factory options for a mapped smoke until #134 is resolved; do not claim persisted-setting activation from that smoke.
