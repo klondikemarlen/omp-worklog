@@ -17,6 +17,7 @@
 ## Invariants
 
 - Project Time evidence remains the source of measured duration and source-side project identity.
+- Keep every positive measured duration in review output, including intervals too short to appear in rounded decimal hours. Duration precision is independent from a destination's rounding or billing policy.
 - A missing, ambiguous, or unassigned destination never becomes an implicit Harvest assignment; the draft remains review-required.
 - A mapping does not rewrite the source evidence or prove that an external task is correct.
 - A generated narrative can help a person review a draft but cannot establish task identity or create a factual external note.

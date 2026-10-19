@@ -332,7 +332,16 @@ export function createProjectTimeProjectNamesLoader({ read = readFileSync, stat 
     const path = logPath || defaultProjectTimeLogPath()
     try {
       const { mtimeMs, size } = stat(path)
-      const stamp = `${mtimeMs}:${size}`
+      let stamp = `${mtimeMs}:${size}`
+      if (path.endsWith(".sqlite")) {
+        // Committed WAL writes need not touch the main database until a checkpoint.
+        try {
+          const wal = stat(`${path}-wal`)
+          stamp += `:${wal.mtimeMs}:${wal.size}`
+        } catch (error) {
+          if (error.code !== "ENOENT") throw error
+        }
+      }
       if (cachedPath === path && cachedStamp === stamp) return cachedProjects
 
       cachedProjects = projectTimeProjectNames(readProjectTimeState(path, { read }))

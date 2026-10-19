@@ -1,4 +1,8 @@
 import assert from "node:assert/strict"
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { DatabaseSync } from "node:sqlite"
 import test from "node:test"
 
 import ompWorklogExtension, { createProjectTimeDraftTool, createProjectTimeProjectNamesLoader, createTimeOffTool, ompWorklogArgumentCompletions, parseCommandArguments, parseOmpWorklogArguments, timeOffArguments } from "../index.js"
@@ -255,6 +259,28 @@ test("when log metadata is unchanged, it caches local project names", () => {
   assert.equal(reads, 2)
 })
 
+test("when a project is committed to SQLite WAL, completion sees it without restarting", t => {
+  // Arrange
+  const directory = mkdtempSync(join(tmpdir(), "worklog-completion-"))
+  const logPath = join(directory, "time-log.sqlite")
+  const database = new DatabaseSync(logPath)
+  t.after(() => {
+    database.close()
+    rmSync(directory, { recursive: true, force: true })
+  })
+  database.exec("PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0; CREATE TABLE entries (entry_json TEXT NOT NULL)")
+  const insert = database.prepare("INSERT INTO entries (entry_json) VALUES (?)")
+  insert.run(JSON.stringify({ sourceKind: "human_active", project: "Demo" }))
+  const loader = createProjectTimeProjectNamesLoader()
+  assert.deepEqual(loader(logPath), ["Demo"])
+
+  // Act
+  insert.run(JSON.stringify({ sourceKind: "human_active", project: "New Project" }))
+  const projects = loader(logPath)
+
+  // Assert
+  assert.deepEqual(projects, ["Demo", "New Project"])
+})
 
 test("when parsing quoted timesheet arguments, it preserves project values", () => {
   // Arrange
