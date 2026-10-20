@@ -81,9 +81,9 @@ Type `/worklog ` to discover review, timesheet, stats, plan, and submit. Date al
 
 ### Daily Human and AI Reports and Reviewed Batches
 
-At the end of a workday, run `/worklog review`. It opens today's worklog inside OMP: edit each project's duration, destination, and factual note, then choose **Mark reviewed** or **Exclude entry**. When all retained entries are ready, choose **Submit to Harvest** once. No JSON editing or path copying is required. Use `/worklog review yesterday` for another day.
+At the end of a workday, run `/worklog review`. It opens today's worklog inside OMP: edit each project's duration, destination, and factual note, then choose **Mark reviewed** or **Exclude entry**. A duration above the automatic candidate also requires **Edit adjustment reason**. When all retained entries are ready, choose **Submit to Harvest** and confirm the displayed snapshot. No JSON editing or path copying is required. Use `/worklog review yesterday` for another day.
 
-**Save and close** preserves your private draft for the next run. **Refresh evidence** rebuilds the snapshot after confirmation and retains the prior draft privately. Review does not submit anything until you explicitly choose Submit.
+**Save and close** preserves your private draft, including correction reasons, for the next run. **Refresh evidence** rebuilds the snapshot after confirmation, clears corrections and review state, and retains the prior draft privately. Review does not submit anything until you approve the final confirmation.
 
 ```text
 /worklog stats 2026-10-05 2026-10-18
@@ -137,6 +137,12 @@ For independent comparison with manually recorded Harvest entries, follow the [p
 Version `0.14.0` is a clean identity cutover. Uninstall the retired `harvest-worklog` gem and OMP plugin, then install `omp-worklog`; replace former `harvest-worklog` CLI and `/harvest-worklog` command invocations with `omp-worklog` and `/omp-worklog`. The retired package, executable, command, tools, module, and settings aliases are not retained.
 
 Version `0.14.3` renames the OMP slash command from `/omp-worklog` to `/worklog`; the `omp-worklog` package identity and CLI executable are unchanged.
+
+## Changes in 0.17.0
+
+- Allow explicitly reviewed duration increases with a required private adjustment reason, without changing the automatic candidate or source evidence.
+- Preserve corrections across save/resume and show candidate, reviewed duration, and rationale in the final approval.
+- Keep native review, saved-batch validation, and Ruby filing consistent while retaining duplicate and uncertain-outcome protections.
 
 ## Changes in 0.16.1
 

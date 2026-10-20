@@ -13,7 +13,7 @@
 | Work item | Optional issue or pull-request attribution attached to evidence. It provides review context, not a destination assignment. | Evidence record |
 | Time-log record | The intended provider-neutral output: `project: task: duration`, built from reviewed Project Time evidence. | Product direction |
 | Draft | A deterministic, review-only proposal derived from local evidence. It can contain a configured destination, but it has not written anywhere. | This repository |
-| Review batch | Private project/day records with candidate duration, reviewer-adjusted duration, destination, factual notes, and explicit approval state. | Human review and this repository |
+| Review batch | Private project/day records with original candidate duration, reviewer-adjusted duration, an optional correction reason, destination, factual notes, and explicit approval state. | Human review and this repository |
 | Submission receipt | Private record of a pending or completed destination create used for reconciliation and safe retry handling. | Harvest adapter |
 | Mapping | Local configuration that maps a Project Time project to a Harvest project and task. It is a projection rule, not source evidence. | User configuration |
 | Destination | An external system and its project/task identity. Harvest is the only supported destination today. | Destination adapter |
@@ -29,6 +29,7 @@
 - Concurrent projects may retain independent approved durations while each provides meaningful value and the user is not blocking it; there is no global cross-project hour cap.
 - Overlapping source kinds or sessions within one project do not multiply its candidate duration. A same-session response gap may be inferred only within the selected grace, five minutes by default.
 - Historical elapsed intervals cannot establish progress, waiting-on-user state, or dormancy. Candidates stay review-required; approval confirms the reviewed duration and note, not a new claim about the original evidence.
+- A reviewer may exceed an automatic candidate only with an explicit nonblank adjustment reason. The original candidate and source evidence remain unchanged; the correction is human-authored, not newly measured or certified work.
 - A batch approval authorizes only its reviewed snapshot. Stable project/day identities prevent a changed snapshot from silently creating a second entry.
 
 ## Boundary Example
