@@ -138,6 +138,11 @@ Version `0.14.0` is a clean identity cutover. Uninstall the retired `harvest-wor
 
 Version `0.14.3` renames the OMP slash command from `/omp-worklog` to `/worklog`; the `omp-worklog` package identity and CLI executable are unchanged.
 
+## Changes in 0.16.1
+
+- Keep the time-off tool's numeric schema compatible with Codex requests.
+- Continue requiring positive finite hours while accepting small fractional durations.
+
 ## Changes in 0.16.0
 
 - Review and submit today's worklog inside OMP with `/worklog review [DATE]`.
