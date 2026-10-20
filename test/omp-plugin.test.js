@@ -152,6 +152,32 @@ test("when time off is requested, it registers an approved write tool", async ()
   assert.equal(result.content[0].text, "Created 2026-07-17")
 })
 
+test("when time-off hours are nonpositive or nonfinite, it rejects the request", () => {
+  // Arrange
+  const tool = createTimeOffTool(z)
+  const assignment = { project: "PTO", task: "Vacation" }
+
+  // Act
+  const accepted = [0, -1, NaN, Infinity, -Infinity].map(hours =>
+    tool.parameters.refinements.every(refinement => refinement({ ...assignment, hours })))
+
+  // Assert
+  assert.deepEqual(accepted, [false, false, false, false, false])
+})
+
+test("when time-off hours are fractional or omitted, it accepts the request", () => {
+  // Arrange
+  const tool = createTimeOffTool(z)
+  const assignment = { project: "PTO", task: "Vacation" }
+
+  // Act
+  const accepted = [undefined, 0.001, 0.25, 7.5].map(hours =>
+    tool.parameters.refinements.every(refinement => refinement({ ...assignment, hours })))
+
+  // Assert
+  assert.deepEqual(accepted, [true, true, true, true])
+})
+
 test("when defaults and explicit regions are configured, it includes both", async () => {
   // Arrange
   const calls = []

@@ -204,12 +204,13 @@ export function createTimeOffTool(z, { command = "omp-worklog", defaultHours = 7
       task: nonBlankString(z).optional(),
       projectId: z.number().int().min(1).optional(),
       taskId: z.number().int().min(1).optional(),
-      hours: z.number().min(Number.MIN_VALUE).optional(),
+      hours: z.number().min(0).optional(),
       notes: nonBlankString(z).optional(),
       holidayRegions: z.array(nonBlankString(z)).optional(),
       dryRun: z.boolean().optional(),
     })
       .refine(hasValidAssignment, { message: "supply project and task, or projectId and taskId, but not both" })
+      .refine(params => params.hours === undefined || (Number.isFinite(params.hours) && params.hours > 0), { message: "hours must be a positive finite number" })
       .refine(params => configuredHolidayRegions.length > 0 || normalizeHolidayRegions(params.holidayRegions ?? []).length > 0, { message: "supply holidayRegions when no regions are configured" }),
     async execute(_toolCallId, params, signal, onUpdate, ctx) {
       const args = timeOffArguments(params, { defaultHours, holidayRegions: configuredHolidayRegions })
