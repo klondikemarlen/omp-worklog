@@ -53,21 +53,37 @@ function readReviewBatch(batchPath) {
   if (batch?.format !== "omp-worklog/review-batch" || batch.version !== 1 || !Array.isArray(batch.entries)) {
     throw new Error("Expected an omp-worklog/review-batch v1 document.")
   }
+  for (const entry of batch.entries) {
+    if (Object.hasOwn(entry, "adjustmentReason") && typeof entry.adjustmentReason !== "string") {
+      throw new Error("The review batch contains an invalid_entry_schema: adjustmentReason must be a string.")
+    }
+  }
 
   return batch
 }
 
 function reviewedEntries(batch) {
-  return batch.entries.length > 0 && batch.entries.every(entry =>
-    entry.reviewed === true &&
-    typeof entry.project === "string" && entry.project.trim() &&
-    typeof entry.task === "string" && entry.task.trim() &&
-    typeof entry.notes === "string" && entry.notes.trim() &&
-    Number.isSafeInteger(entry.milliseconds) && entry.milliseconds > 0 &&
-    Number.isSafeInteger(entry.candidateMilliseconds) && entry.milliseconds <= entry.candidateMilliseconds)
+  return batch.entries.length > 0 && batch.entries.every(entry => {
+    const validDuration = Number.isSafeInteger(entry.milliseconds) && entry.milliseconds > 0 &&
+      Number.isSafeInteger(entry.candidateMilliseconds) && entry.candidateMilliseconds > 0
+    const increaseHasReason = entry.milliseconds <= entry.candidateMilliseconds ||
+      (typeof entry.adjustmentReason === "string" && entry.adjustmentReason.trim().length > 0)
+    const validReason = !Object.hasOwn(entry, "adjustmentReason") || typeof entry.adjustmentReason === "string"
+    return entry.reviewed === true &&
+      typeof entry.project === "string" && entry.project.trim() &&
+      typeof entry.task === "string" && entry.task.trim() &&
+      typeof entry.notes === "string" && entry.notes.trim() &&
+      validDuration && validReason && increaseHasReason
+  })
 }
 
 async function submitBatchDocument(batch, params, options, context) {
+  for (const entry of batch.entries) {
+    if (entry.milliseconds > entry.candidateMilliseconds &&
+      (typeof entry.adjustmentReason !== "string" || entry.adjustmentReason.trim().length === 0)) {
+      throw new Error("duration_increase_requires_reason: an above-candidate duration needs a nonblank adjustment reason.")
+    }
+  }
   if (!reviewedEntries(batch)) {
     throw new Error("Review every record's destination, duration, progress/blockers, and factual note before filing.")
   }
@@ -116,6 +132,7 @@ function batchReviewText(batch) {
   ]
   for (const entry of batch.entries) {
     lines.push("", `${entry.spentDate} / ${entry.localProject}`, `Candidate: ${exactDuration(entry.candidateMilliseconds)}; reviewed: ${exactDuration(entry.milliseconds)}`,
+      `Human correction: ${entry.milliseconds > entry.candidateMilliseconds ? "yes" : "no"}; adjustment reason: ${entry.adjustmentReason || "none"}.`,
       `Harvest: ${entry.project || "DESTINATION REQUIRED"} / ${entry.task || "TASK REQUIRED"}`,
       `Note: ${entry.notes || "REVIEWED NOTE REQUIRED"}`)
   }
@@ -190,6 +207,12 @@ async function runDailyReview(params, context, options) {
     }
 
     if (!reviewedEntries(batch)) throw new Error("Complete every retained entry's review before submitting.")
+    const approval = await context.ui.confirm("Approve reviewed worklog?", batchReviewText(batch))
+    if (!approval) {
+      batch.approved = false
+      saveReviewBatch(batchPath, batch)
+      return { content: `Daily worklog saved; nothing submitted.\nPrivate draft: ${batchPath}\nRun /worklog review ${params.from} again with the same filters to resume.`, details: { status: "saved", batchPath } }
+    }
     batch.approved = true
     saveReviewBatch(batchPath, batch)
     const submitted = await submitBatchDocument(batch, { dryRun: false }, options, context)

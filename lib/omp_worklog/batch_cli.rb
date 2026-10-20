@@ -19,8 +19,10 @@ module OmpWorklog
     ENTRY_KEYS = %w[
       id spentDate localProject project task candidateMilliseconds milliseconds
       humanActiveMilliseconds agentTurnMilliseconds bridgedGapMilliseconds
-      sourceEntryIds notes reviewed reviewReasons
+      sourceEntryIds notes reviewed reviewReasons adjustmentReason
     ].freeze
+    REQUIRED_ENTRY_KEYS = (ENTRY_KEYS - ["adjustmentReason"]).freeze
+    MAX_SAFE_INTEGER = 9_007_199_254_740_991
 
     class InputError < StandardError
       attr_reader :code
@@ -136,7 +138,7 @@ module OmpWorklog
     end
 
     def validate_entry!(entry, from, to, seen_ids)
-      require_hash_with_keys!(entry, ENTRY_KEYS, "invalid_entry_schema")
+      require_entry_keys!(entry)
       spent_date = valid_date!(entry["spentDate"], "invalid_entry_date")
       raise InputError, "entry_date_out_of_range" unless spent_date.between?(from, to)
 
@@ -149,7 +151,13 @@ module OmpWorklog
 
       candidate = positive_integer!(entry["candidateMilliseconds"], "invalid_duration")
       milliseconds = positive_integer!(entry["milliseconds"], "invalid_duration")
-      raise InputError, "duration_exceeds_candidate" if milliseconds > candidate
+      adjustment_reason = entry["adjustmentReason"]
+      if entry.key?("adjustmentReason") && !adjustment_reason.is_a?(String)
+        raise InputError, "invalid_entry_schema"
+      end
+      if milliseconds > candidate && (!adjustment_reason.is_a?(String) || adjustment_reason.strip.empty?)
+        raise InputError, "duration_increase_requires_reason"
+      end
 
       nonnegative_integer!(entry["humanActiveMilliseconds"], "invalid_entry_schema")
       nonnegative_integer!(entry["agentTurnMilliseconds"], "invalid_entry_schema")
@@ -173,6 +181,13 @@ module OmpWorklog
       }
     end
 
+    def require_entry_keys!(entry)
+      unless entry.is_a?(Hash) &&
+             (entry.keys.sort == REQUIRED_ENTRY_KEYS.sort || entry.keys.sort == ENTRY_KEYS.sort)
+        raise InputError, "invalid_entry_schema"
+      end
+    end
+
     def require_approval!(batch)
       raise InputError, "batch_not_approved" unless @dry_run || batch[:approved]
     end
@@ -188,7 +203,7 @@ module OmpWorklog
     end
 
     def positive_integer!(value, code)
-      raise InputError, code unless value.is_a?(Integer) && value.positive?
+      raise InputError, code unless value.is_a?(Integer) && value.positive? && value <= MAX_SAFE_INTEGER
 
       value
     end

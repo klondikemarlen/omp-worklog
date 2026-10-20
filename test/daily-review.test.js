@@ -45,7 +45,58 @@ function projectRow(index = 0) {
   return `1. Demo — ${index ? "reviewed" : "unreviewed"} — 1:01:01.234`
 }
 
-test("editing a reviewed entry clears review and requires a new review before submit", async () => {
+test("when an above-candidate duration needs a reason before review, it saves and reviews the human correction", async () => {
+  // Arrange
+  const batch = makeBatch([makeEntry()])
+  const { ui } = createUI([
+    projectRow(),
+    "Edit duration",
+    "Mark reviewed",
+    "Edit adjustment reason",
+    "Mark reviewed",
+    "Submit to Harvest",
+  ], ["1:02:01.234", "Worked beyond tracked sessions"])
+
+  // Act
+  const outcome = await reviewDailyWorklog(batch, ui, () => {})
+
+  // Assert
+  assert.equal(outcome.action, "submit")
+  assert.equal(batch.entries[0].milliseconds, 3_721_234)
+  assert.equal(batch.entries[0].adjustmentReason, "Worked beyond tracked sessions")
+  assert.equal(batch.entries[0].reviewed, true)
+})
+
+test("when an adjustment reason changes, a reviewed correction must be reviewed again", async () => {
+  // Arrange
+  const batch = makeBatch([makeEntry({
+    milliseconds: 3_721_234,
+    adjustmentReason: "Initial correction reason",
+    reviewed: true,
+  })])
+  batch.approved = true
+  const { ui } = createUI([
+    "1. Demo — reviewed — human correction — 1:02:01.234",
+    "Edit adjustment reason",
+    "Mark reviewed",
+    "Submit to Harvest",
+  ], ["Corrected explanation"])
+  const savedReviewStates = []
+
+  // Act
+  const outcome = await reviewDailyWorklog(batch, ui, draft => {
+    savedReviewStates.push(draft.entries[0].reviewed)
+  })
+
+  // Assert
+  assert.equal(outcome.action, "submit")
+  assert.equal(batch.entries[0].adjustmentReason, "Corrected explanation")
+  assert.deepEqual(savedReviewStates, [false, true])
+  assert.equal(batch.approved, false)
+})
+
+test("when a reviewed note changes, review is cleared and must be repeated before submission", async () => {
+  // Arrange
   const batch = makeBatch([makeEntry({ reviewed: true })])
   const { ui } = createUI([
     projectRow(1),
@@ -55,8 +106,10 @@ test("editing a reviewed entry clears review and requires a new review before su
   ], ["Updated factual progress"])
   const savedStates = []
 
+  // Act
   const outcome = await reviewDailyWorklog(batch, ui, draft => savedStates.push({ ...draft.entries[0] }))
 
+  // Assert
   assert.equal(outcome.action, "submit")
   assert.equal(batch.entries[0].notes, "Updated factual progress")
   assert.equal(batch.entries[0].reviewed, true)
@@ -65,7 +118,8 @@ test("editing a reviewed entry clears review and requires a new review before su
   assert.equal(savedStates[1].reviewed, true)
 })
 
-test("invalid duration and missing note keep Submit blocked until corrected", async () => {
+test("when invalid duration and missing note block submission, correcting them allows review", async () => {
+  // Arrange
   const batch = makeBatch([makeEntry({ notes: "", reviewed: true })])
   const { ui } = createUI([
     "Submit to Harvest",
@@ -75,11 +129,13 @@ test("invalid duration and missing note keep Submit blocked until corrected", as
     "Edit note",
     "Mark reviewed",
     "Submit to Harvest",
-  ], ["1:01:01.235", "A factual note"])
+  ], ["0:00:00.000", "A factual note"])
   let saveCount = 0
 
+  // Act
   const outcome = await reviewDailyWorklog(batch, ui, () => { saveCount += 1 })
 
+  // Assert
   assert.equal(outcome.action, "submit")
   assert.equal(batch.entries[0].milliseconds, 3_661_234)
   assert.equal(batch.entries[0].notes, "A factual note")
@@ -87,17 +143,21 @@ test("invalid duration and missing note keep Submit blocked until corrected", as
   assert.equal(saveCount, 2)
 })
 
-test("valid reviewed entry can be submitted with one explicit selection", async () => {
+test("when a ready entry is submitted, the explicit action returns the reviewed batch", async () => {
+  // Arrange
   const batch = makeBatch([makeEntry({ reviewed: true })])
   const { ui } = createUI(["Submit to Harvest"])
 
+  // Act
   const outcome = await reviewDailyWorklog(batch, ui, () => assert.fail("No draft edits occurred"))
 
+  // Assert
   assert.deepEqual(outcome, { action: "submit", batch })
   assert.equal(batch.approved, false)
 })
 
-test("excluding an entry removes it from the retained batch and submission", async () => {
+test("when an entry is excluded, it is removed from the retained batch", async () => {
+  // Arrange
   const batch = makeBatch([makeEntry(), makeEntry({ id: "entry-2", localProject: "Other", reviewed: true })])
   const { ui } = createUI([
     "1. Demo — unreviewed — 1:01:01.234",
@@ -105,19 +165,24 @@ test("excluding an entry removes it from the retained batch and submission", asy
     "Submit to Harvest",
   ])
 
+  // Act
   const outcome = await reviewDailyWorklog(batch, ui, () => {})
 
+  // Assert
   assert.equal(outcome.action, "submit")
   assert.deepEqual(batch.entries.map(entry => entry.localProject), ["Other"])
 })
 
-test("cancelling after an edit saves the draft without approval", async () => {
+test("when review closes after an edit, it saves the draft without approval", async () => {
+  // Arrange
   const batch = makeBatch([makeEntry({ reviewed: true })])
   const { ui } = createUI([projectRow(1), "Edit note", undefined, undefined], ["Saved factual note"])
   let saveCount = 0
 
+  // Act
   const outcome = await reviewDailyWorklog(batch, ui, () => { saveCount += 1 })
 
+  // Assert
   assert.equal(outcome.action, "save")
   assert.equal(outcome.batch, batch)
   assert.equal(batch.entries[0].notes, "Saved factual note")
@@ -126,7 +191,8 @@ test("cancelling after an edit saves the draft without approval", async () => {
   assert.equal(saveCount, 1)
 })
 
-test("duration editor accepts exact millisecond values through the candidate boundary", async () => {
+test("when duration is edited, exact millisecond values are accepted through candidate time", async () => {
+  // Arrange
   const batch = makeBatch([makeEntry({ milliseconds: 1 })])
   const { ui } = createUI([
     "1. Demo — unreviewed — 0:00:00.001",
@@ -137,32 +203,50 @@ test("duration editor accepts exact millisecond values through the candidate bou
   ], ["0:00:00.001", "1:01:01.234"])
   const savedDurations = []
 
+  // Act
   const outcome = await reviewDailyWorklog(batch, ui, draft => savedDurations.push(draft.entries[0].milliseconds))
 
+  // Assert
   assert.equal(outcome.action, "submit")
   assert.deepEqual(savedDurations, [1, 3_661_234, 3_661_234])
   assert.equal(batch.entries[0].milliseconds, 3_661_234)
 })
 
-test("an empty batch never offers or returns submission", async () => {
+test("when the batch is empty, submission is unavailable", async () => {
+  // Arrange
   const batch = makeBatch([])
   const { ui, observed } = createUI(["Save and close"])
 
+  // Act
   const outcome = await reviewDailyWorklog(batch, ui, () => assert.fail("No draft changes occurred"))
 
-  assert.equal(outcome.action, "save")
+  // Assert
   assert.equal(outcome.batch, batch)
   assert.equal(observed.selectors[0].options.some(option => option.label === "Submit to Harvest"), false)
 })
 
-test("editing a destination trims editor line endings before review and submission", async () => {
+test("when a destination is edited, surrounding line endings are trimmed", async () => {
+  // Arrange
   const batch = makeBatch()
   const { ui } = createUI([
     projectRow(), "Edit destination project", "Mark reviewed", "Submit to Harvest",
   ], ["  Corrected destination\n"])
 
-  const outcome = await reviewDailyWorklog(batch, ui, () => {})
+  // Act
+  await reviewDailyWorklog(batch, ui, () => {})
 
-  assert.equal(outcome.action, "submit")
+  // Assert
   assert.equal(batch.entries[0].project, "Corrected destination")
+})
+
+test("when correction provenance is malformed, a ready entry cannot submit", async () => {
+  // Arrange
+  const batch = makeBatch([makeEntry({ reviewed: true, adjustmentReason: null })])
+  const { ui } = createUI(["Submit to Harvest", "Save and close"])
+
+  // Act
+  const outcome = await reviewDailyWorklog(batch, ui, () => assert.fail("No entry was edited"))
+
+  // Assert
+  assert.equal(outcome.action, "save")
 })

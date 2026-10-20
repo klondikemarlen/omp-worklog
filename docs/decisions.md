@@ -49,3 +49,11 @@ JavaScript is the OMP integration runtime; Ruby provides the existing standalone
 Concurrent different projects can each retain their full reviewed duration when work provides meaningful value and the user responds before the session becomes dormant. Worklog merges overlap within each project and infers only same-session gaps within the selected five-minute response grace. Raw human and agent streams remain independent observations, not automatic billing claims.
 
 Historical evidence lacks blocker/progress transitions, so a human reviews those conditions before approving a daily batch. Approval leads to automatic filing of that snapshot, not unattended future submission. The evidence collector remains provider-neutral. See [billing policy and review](/docs/billing.md).
+
+## D-009: Separate Human Corrections from Automatic Candidates
+
+**Status:** Accepted
+
+Incomplete automatic evidence must not become an uncorrectable ceiling on independently confirmed work. A reviewed duration may exceed its candidate when the reviewer supplies a nonblank private adjustment reason. Keep the measured candidate, source observations, and stable identity unchanged; never enlarge the candidate to bypass validation.
+
+The optional string `adjustmentReason` extends review-batch version 1. Existing non-increased drafts may omit it; malformed metadata is rejected. Edits require fresh review and approval, final approval displays both durations and the reason, and confirmed evidence refresh archives the prior correction before rebuilding an unapproved draft. The reason stays out of provider notes. This revises the earlier candidate ceiling, not the independent calibration policy or the requirement for authoritative signals before unattended billing.

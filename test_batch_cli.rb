@@ -81,14 +81,17 @@ class BatchCLITest < Minitest::Test
     end
   end
 
-  def test_changed_content_for_an_existing_identity_is_a_conflict
+  def test_changed_duration_for_an_existing_identity_is_a_conflict
     Dir.mktmpdir("batch-cli-") do |state_dir|
       entry = review_entry("Internal", "Internal", "Development", 3_600_000)
       client = FakeHarvestClient.new
       first_status, = run_batch(client, review_batch([entry]), state_dir:)
-      changed_entry = entry.merge("milliseconds" => 1_800_000)
+      corrected_entry = entry.merge(
+        "milliseconds" => 4_200_000,
+        "adjustmentReason" => "Corrected an undercount after review"
+      )
 
-      changed_status, changed_result, = run_batch(client, review_batch([changed_entry]), state_dir:)
+      changed_status, changed_result, = run_batch(client, review_batch([corrected_entry]), state_dir:)
 
       assert_equal 0, first_status
       assert_equal 1, changed_status
@@ -238,16 +241,69 @@ class BatchCLITest < Minitest::Test
     end
   end
 
-  def test_duration_above_candidate_is_rejected_before_provider_access
+  def test_increased_duration_with_reason_can_be_preflighted_and_filed_without_changing_notes
     Dir.mktmpdir("batch-cli-") do |state_dir|
-      entry = review_entry("Internal", "Internal", "Development", 3_600_000).merge("milliseconds" => 3_600_001)
+      entry = review_entry("Internal", "Internal", "Development", 3_600_000).merge(
+        "milliseconds" => 4_200_000,
+        "adjustmentReason" => "Corrected an undercount after review"
+      )
+      client = FakeHarvestClient.new
+      batch = review_batch([entry], approved: false)
+
+      dry_run_status, dry_run_result, = run_batch(client, batch, state_dir:, dry_run: true)
+      submit_status, submit_result, = run_batch(client, review_batch([entry]), state_dir:)
+
+      assert_equal 0, dry_run_status
+      assert_equal "ready", dry_run_result.fetch("status")
+      assert_equal 0, submit_status
+      assert_equal "created", submit_result.fetch("results").first.fetch("status")
+      assert_equal [4_200_000 / 3_600_000.0], client.created_entries.map { |filed| filed.fetch("hours") }
+      assert_equal ["Reviewed ordinary work"], client.created_entries.map { |filed| filed.fetch("notes") }
+      refute_includes JSON.generate(client.created_entries), "Corrected an undercount"
+    end
+  end
+
+  def test_increased_duration_without_reason_is_rejected_before_provider_access
+    Dir.mktmpdir("batch-cli-") do |state_dir|
+      entry = review_entry("Internal", "Internal", "Development", 3_600_000).merge("milliseconds" => 4_200_000)
       client = FakeHarvestClient.new
 
       status, result, error = run_batch(client, review_batch([entry]), state_dir:)
 
       assert_equal 1, status
       assert_equal "blocked", result.fetch("status")
-      assert_includes error, "duration_exceeds_candidate"
+      assert_includes error, "duration_increase_requires_reason"
+      assert_empty client.requests
+    end
+  end
+
+  def test_increased_duration_with_blank_reason_is_rejected_before_provider_access
+    Dir.mktmpdir("batch-cli-") do |state_dir|
+      entry = review_entry("Internal", "Internal", "Development", 3_600_000).merge(
+        "milliseconds" => 4_200_000,
+        "adjustmentReason" => " \n"
+      )
+      client = FakeHarvestClient.new
+
+      status, result, error = run_batch(client, review_batch([entry]), state_dir:)
+
+      assert_equal 1, status
+      assert_equal "blocked", result.fetch("status")
+      assert_includes error, "duration_increase_requires_reason"
+      assert_empty client.requests
+    end
+  end
+
+  def test_non_string_adjustment_reason_is_rejected_before_provider_access
+    Dir.mktmpdir("batch-cli-") do |state_dir|
+      entry = review_entry("Internal", "Internal", "Development", 3_600_000).merge("adjustmentReason" => nil)
+      client = FakeHarvestClient.new
+
+      status, result, error = run_batch(client, review_batch([entry]), state_dir:)
+
+      assert_equal 1, status
+      assert_equal "blocked", result.fetch("status")
+      assert_includes error, "invalid_entry_schema"
       assert_empty client.requests
     end
   end
