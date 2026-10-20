@@ -112,6 +112,7 @@ export function createProjectTimeReviewBatch(state, mappings, options = {}) {
         bridgedGapMilliseconds: projectReport.bridgedGapMilliseconds,
         sourceEntryIds: [...projectReport.sourceEntryIds],
         notes: "",
+        adjustmentReason: "",
         reviewed: false,
         reviewReasons: [
           ...projectReport.reviewReasons,

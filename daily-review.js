@@ -1,5 +1,5 @@
 const MAIN_ACTIONS = ["Submit to Harvest", "Save and close", "Refresh evidence"]
-const ENTRY_ACTIONS = ["Edit duration", "Edit destination project", "Edit task", "Edit note", "Mark reviewed", "Exclude entry", "Back"]
+const ENTRY_ACTIONS = ["Edit duration", "Edit adjustment reason", "Edit destination project", "Edit task", "Edit note", "Mark reviewed", "Exclude entry", "Back"]
 
 function formatDuration(milliseconds) {
   const hours = Math.floor(milliseconds / 3_600_000)
@@ -27,11 +27,15 @@ function parseDuration(value) {
 }
 
 function hasReadyFields(entry) {
+  const hasValidDuration = Number.isSafeInteger(entry.milliseconds) && entry.milliseconds > 0 &&
+    Number.isSafeInteger(entry.candidateMilliseconds) && entry.candidateMilliseconds > 0
+  const increaseHasReason = entry.milliseconds <= entry.candidateMilliseconds ||
+    (typeof entry.adjustmentReason === "string" && entry.adjustmentReason.trim().length > 0)
+  const hasValidReason = !Object.hasOwn(entry, "adjustmentReason") || typeof entry.adjustmentReason === "string"
   return typeof entry.project === "string" && entry.project.trim().length > 0 &&
     typeof entry.task === "string" && entry.task.trim().length > 0 &&
     typeof entry.notes === "string" && entry.notes.trim().length > 0 &&
-    Number.isSafeInteger(entry.milliseconds) && entry.milliseconds > 0 &&
-    Number.isSafeInteger(entry.candidateMilliseconds) && entry.milliseconds <= entry.candidateMilliseconds
+    hasValidDuration && hasValidReason && increaseHasReason
 }
 
 function isReadyToSubmit(batch) {
@@ -40,7 +44,8 @@ function isReadyToSubmit(batch) {
 
 function entryLabel(entry, index) {
   const reviewState = entry.reviewed ? "reviewed" : "unreviewed"
-  return `${index + 1}. ${entry.localProject} — ${reviewState} — ${formatDuration(entry.milliseconds)}`
+  const correction = entry.milliseconds > entry.candidateMilliseconds ? " — human correction" : ""
+  return `${index + 1}. ${entry.localProject} — ${reviewState}${correction} — ${formatDuration(entry.milliseconds)}`
 }
 
 function entryDescription(entry) {
@@ -51,7 +56,8 @@ function entryDescription(entry) {
     : "Review uncertainty: confirm progress and user blockers; historical details are not reconstructed."
   return [
     "Concurrent-project overlap is retained; intervals within each project are unioned.",
-    `Human-active: ${humanActive}; AI observations: ${agentTurns}; candidate: ${formatDuration(entry.candidateMilliseconds)}.`,
+    `Human-active: ${humanActive}; AI observations: ${agentTurns}; candidate: ${formatDuration(entry.candidateMilliseconds)}; reviewed duration: ${formatDuration(entry.milliseconds)}.`,
+    `Human correction: ${entry.milliseconds > entry.candidateMilliseconds ? "yes" : "no"}. Adjustment reason: ${entry.adjustmentReason || "none"}.`,
     `Destination: ${entry.project || "required"} / ${entry.task || "required"}. Note: ${entry.notes || "required"}.`,
     uncertainty,
   ].join(" ")
@@ -65,7 +71,7 @@ function mainOptions(batch) {
   if (batch.entries.length > 0) {
     rows.push({ label: MAIN_ACTIONS[0], description: isReadyToSubmit(batch)
       ? "Approve this reviewed batch and submit it to Harvest."
-      : "Unavailable until every retained entry is reviewed and has a valid destination, note, and duration." })
+      : "Unavailable until every retained entry is reviewed and has a valid destination, note, duration, and correction reason when needed." })
   }
   rows.push({ label: MAIN_ACTIONS[1], description: "Save progress privately and close without approval." })
   rows.push({ label: MAIN_ACTIONS[2], description: "Replace this draft with refreshed evidence after confirmation." })
@@ -77,8 +83,8 @@ async function editDuration(ui, entry, save) {
   if (value === undefined) return
 
   const milliseconds = parseDuration(value)
-  if (milliseconds === null || milliseconds <= 0 || milliseconds > entry.candidateMilliseconds) {
-    ui.notify(`Enter a duration greater than zero and no more than ${formatDuration(entry.candidateMilliseconds)}.`, "error")
+  if (milliseconds === null || milliseconds <= 0) {
+    ui.notify("Enter a duration greater than zero.", "error")
     return
   }
   entry.milliseconds = milliseconds
@@ -98,7 +104,7 @@ async function editField(ui, entry, field, title, save) {
 
 function markReviewed(ui, entry, save) {
   if (!hasReadyFields(entry)) {
-    ui.notify("Add a nonblank destination project, task, factual note, and valid duration before marking reviewed.", "error")
+    ui.notify("Add a nonblank destination project, task, factual note, valid duration, and correction reason when duration exceeds candidate before marking reviewed.", "error")
     return false
   }
   entry.reviewed = true
@@ -117,15 +123,17 @@ async function reviewEntry(batch, index, ui, save) {
       { label: ENTRY_ACTIONS[4] },
       { label: ENTRY_ACTIONS[5] },
       { label: ENTRY_ACTIONS[6] },
+      { label: ENTRY_ACTIONS[7] },
     ])
-    if (selection === undefined || selection === ENTRY_ACTIONS[6]) return
+    if (selection === undefined || selection === ENTRY_ACTIONS[7]) return
 
     if (selection === ENTRY_ACTIONS[0]) await editDuration(ui, entry, save)
-    if (selection === ENTRY_ACTIONS[1]) await editField(ui, entry, "project", "Edit destination project", save)
-    if (selection === ENTRY_ACTIONS[2]) await editField(ui, entry, "task", "Edit task", save)
-    if (selection === ENTRY_ACTIONS[3]) await editField(ui, entry, "notes", "Edit note", save)
-    if (selection === ENTRY_ACTIONS[4] && markReviewed(ui, entry, save)) return
-    if (selection === ENTRY_ACTIONS[5]) {
+    if (selection === ENTRY_ACTIONS[1]) await editField(ui, entry, "adjustmentReason", "Edit adjustment reason", save)
+    if (selection === ENTRY_ACTIONS[2]) await editField(ui, entry, "project", "Edit destination project", save)
+    if (selection === ENTRY_ACTIONS[3]) await editField(ui, entry, "task", "Edit task", save)
+    if (selection === ENTRY_ACTIONS[4]) await editField(ui, entry, "notes", "Edit note", save)
+    if (selection === ENTRY_ACTIONS[5] && markReviewed(ui, entry, save)) return
+    if (selection === ENTRY_ACTIONS[6]) {
       batch.entries.splice(index, 1)
       save()
       return
@@ -138,14 +146,17 @@ async function reviewEntry(batch, index, ui, save) {
  * The caller owns private storage and the single approval transition.
  */
 export async function reviewDailyWorklog(batch, ui, save) {
-  const persist = () => save(batch)
+  const persist = () => {
+    batch.approved = false
+    save(batch)
+  }
   while (true) {
     const selection = await ui.select(`Daily worklog review — ${batch.from}`, mainOptions(batch))
     if (selection === undefined || selection === MAIN_ACTIONS[1]) return { action: "save", batch }
     if (selection === MAIN_ACTIONS[2]) return { action: "refresh", batch }
     if (selection === MAIN_ACTIONS[0]) {
       if (!isReadyToSubmit(batch)) {
-        ui.notify("Review every retained entry and provide a valid destination, factual note, and duration before submitting.", "error")
+        ui.notify("Review every retained entry and provide a valid destination, factual note, duration, and correction reason when needed before submitting.", "error")
         continue
       }
       return { action: "submit", batch }

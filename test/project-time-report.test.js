@@ -10,14 +10,17 @@ const at = (day, hour, minute = 0, second = 0, millisecond = 0) =>
 const oneDay = { from: "2026-10-19", to: "2026-10-19" }
 
 test("when projects overlap and human and agent sources overlap, it preserves independent observations and project concurrency", () => {
+  // Arrange
   const state = evidenceState([
     { id: "human-demo", project: "Demo", sourceKind: "human_active", sessionId: "demo-session", startAtMs: at(19, 9), endAtMs: at(19, 9, 10) },
     { id: "agent-demo", project: "Demo", sourceKind: "agent_turn_elapsed", sessionId: "demo-session", startAtMs: at(19, 9, 5), endAtMs: at(19, 9, 15) },
     { id: "human-other", project: "Other", sourceKind: "human_active", sessionId: "other-session", startAtMs: at(19, 9, 3), endAtMs: at(19, 9, 8) },
   ])
 
+  // Act
   const report = projectTimeDailyReport(state, oneDay)
 
+  // Assert
   assert.deepEqual(report.totals, {
     humanActiveMilliseconds: 900_000,
     agentTurnMilliseconds: 600_000,
@@ -48,13 +51,16 @@ test("when projects overlap and human and agent sources overlap, it preserves in
 })
 
 test("when same-project sessions overlap concurrently, it unions candidate time without capping the observations", () => {
+  // Arrange
   const state = evidenceState([
     { id: "session-one", project: "Demo", sourceKind: "human_active", sessionId: "one", startAtMs: at(19, 9), endAtMs: at(19, 10) },
     { id: "session-two", project: "Demo", sourceKind: "human_active", sessionId: "two", startAtMs: at(19, 9, 30), endAtMs: at(19, 10, 30) },
   ])
 
+  // Act
   const project = projectTimeDailyReport(state, oneDay).days[0].projects[0]
 
+  // Assert
   assert.equal(project.humanActiveMilliseconds, 7_200_000)
   assert.equal(project.sourceUnionMilliseconds, 5_400_000)
   assert.equal(project.candidateMilliseconds, 5_400_000)
@@ -62,6 +68,7 @@ test("when same-project sessions overlap concurrently, it unions candidate time 
 })
 
 test("when same-session gaps meet or exceed response grace, only an exact-grace gap is bridged", () => {
+  // Arrange
   const state = evidenceState([
     { id: "grace-before", project: "Demo", sourceKind: "human_active", sessionId: "grace", startAtMs: at(19, 9), endAtMs: at(19, 9, 1) },
     { id: "grace-after", project: "Demo", sourceKind: "agent_turn_elapsed", sessionId: "grace", startAtMs: at(19, 9, 6), endAtMs: at(19, 9, 7) },
@@ -73,8 +80,10 @@ test("when same-session gaps meet or exceed response grace, only an exact-grace 
     { id: "missing-second", project: "Demo", sourceKind: "human_active", startAtMs: at(19, 12, 3), endAtMs: at(19, 12, 4) },
   ])
 
+  // Act
   const project = projectTimeDailyReport(state, oneDay).days[0].projects[0]
 
+  // Assert
   assert.equal(project.humanActiveMilliseconds, 420_000)
   assert.equal(project.agentTurnMilliseconds, 60_000)
   assert.equal(project.sourceUnionMilliseconds, 480_000)
@@ -88,17 +97,20 @@ test("when same-session gaps meet or exceed response grace, only an exact-grace 
 })
 
 test("when a same-session response gap crosses midnight, it is bridged before each day's cutoff clipping", () => {
+  // Arrange
   const state = evidenceState([
     { id: "before-midnight", project: "Demo", sourceKind: "human_active", sessionId: "night", startAtMs: at(19, 23, 58), endAtMs: at(19, 23, 59) },
     { id: "after-midnight", project: "Demo", sourceKind: "human_active", sessionId: "night", startAtMs: at(20, 0, 3), endAtMs: at(20, 0, 4) },
   ])
 
+  // Act
   const report = projectTimeDailyReport(state, {
     from: "2026-10-19",
     to: "2026-10-20",
     until: "00:02",
   })
 
+  // Assert
   assert.deepEqual(report.days.map(day => ({
     spentDate: day.spentDate,
     humanActiveMilliseconds: day.humanActiveMilliseconds,
@@ -125,8 +137,10 @@ test("when a same-session response gap crosses midnight, it is bridged before ea
 })
 
 test("when report dates or mappings are invalid, it rejects them and still emits zero-evidence days", () => {
+  // Arrange
   const emptyState = evidenceState([])
 
+  // Act / Assert
   assert.throws(() => projectTimeDailyReport(emptyState, { from: "2026-02-30", to: "2026-03-01" }), /valid local date/)
   assert.throws(() => projectTimeDailyReport(emptyState, { from: "today", to: "2026-10-19" }), /ISO date range/)
   assert.throws(() => projectTimeDailyReport(emptyState, { ...oneDay, until: "24:00" }), /HH:MM/)
@@ -139,14 +153,17 @@ test("when report dates or mappings are invalid, it rejects them and still emits
 })
 
 test("when unassigned work has an explicit project mapping, the review batch keeps it unapproved and requires notes", () => {
+  // Arrange
   const state = evidenceState([
     { id: "demo-source", project: "Demo", sourceKind: "human_active", sessionId: "session-1", workItemAttribution: "unassigned", startAtMs: at(19, 9), endAtMs: at(19, 9, 10) },
     { id: "unmapped-source", project: "Unmapped", sourceKind: "human_active", sessionId: "session-2", startAtMs: at(19, 10), endAtMs: at(19, 10, 5) },
   ])
   const mappings = parseProjectTimeMappings({ Demo: { project: "Internal", task: "Development" } })
 
+  // Act
   const batch = createProjectTimeReviewBatch(state, mappings, oneDay)
 
+  // Assert
   assert.equal(batch.approved, false)
   assert.deepEqual(batch.policy, { mode: "concurrent-projects", responseGraceMinutes: 5 })
   assert.deepEqual(batch.entries, [
@@ -163,6 +180,7 @@ test("when unassigned work has an explicit project mapping, the review batch kee
       bridgedGapMilliseconds: 0,
       sourceEntryIds: ["demo-source"],
       notes: "",
+      adjustmentReason: "",
       reviewed: false,
       reviewReasons: ["progress_and_user_blockers_require_review"],
     },
@@ -179,18 +197,21 @@ test("when unassigned work has an explicit project mapping, the review batch kee
       bridgedGapMilliseconds: 0,
       sourceEntryIds: ["unmapped-source"],
       notes: "",
+      adjustmentReason: "",
       reviewed: false,
       reviewReasons: ["progress_and_user_blockers_require_review", "destination_required"],
     },
   ])
 })
 
-test("report project discovery includes agent-only projects but excludes unrelated source kinds", () => {
+test("when discovering report projects, it includes agent-only projects and excludes unrelated source kinds", () => {
+  // Arrange
   const state = evidenceState([
     { project: "Agent-only", sourceKind: "agent_turn_elapsed" },
     { project: "Human", sourceKind: "human_active" },
     { project: "Unrelated", sourceKind: "unknown" },
   ])
 
+  // Act / Assert
   assert.deepEqual(projectTimeProjectNames(state, { includeAgentTurns: true }), ["Agent-only", "Human"])
 })
