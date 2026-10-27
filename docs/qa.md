@@ -8,6 +8,7 @@ The current behavior is covered by focused tests in the repository:
 | --- | --- |
 | Project Time evidence parsing, filtering, grouping, mappings, drafts, and compact timesheet formatting | `test/project-time.test.js` |
 | OMP command parsing, completions, host-resolved settings and option precedence, read-only draft tools, write approval, and interactive summary lifecycle | `test/omp-plugin.test.js` |
+| Live thread/project status, independent human/agent durations, stale snapshot rejection, unavailable evidence, and shutdown | `test/live-status.test.js` |
 | Harvest destination adapter validation and write behavior | `test_omp_worklog.rb` |
 | Installed revision rejection, user-setting preservation, export failure safety, and private recovery snapshots | `test/release-plugin.test.js` |
 | Daily human/AI reports, within-project deduplication, cross-project concurrency, response grace, cutoff, and review candidates | `test/project-time-report.test.js` |
@@ -45,6 +46,8 @@ Use valid leap dates and invalid calendar endpoints when changing date-range val
 For settings changes, exercise the supported host CLI from the intended project cwd, then verify both a saved user mapping and a different project override in separate fresh OMP processes. Explicit factory options must override resolved values, but an injected loader or explicit mapping alone cannot prove host scope resolution. Capability probes and public reports must omit private setting values.
 
 Permanent regressions should verify consumer-visible data or transitions. Remove obsolete expectations that pin data loss or incidental implementation behavior rather than preserving them as policy. Keep temporary probes and private calibration snapshots out of the repository.
+
+For live-status changes, run both released plugins together in a new OMP process with synthetic collector storage. Confirm one readable Worklog line, separate Dev/Agent hour-minute-second counters, ongoing agent updates after human-window expiry, no stale totals after thread/project changes, and restoration of Project Time's standalone display without Worklog. The event-bus unit checks do not establish actual terminal contrast or host lifecycle integration.
 
 For batch changes, exercise the real Ruby client transport against a disposable local HTTP server with synthetic credentials and records. Prove a dry run performs no create, two concurrent approved projects both file, a repeated identity reconciles without duplication, and a later failure leaves truthful partial/uncertain state. A fake exposing invented client methods is not transport proof. Never use actual historical Harvest writes as release QA.
 
