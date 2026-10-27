@@ -54,7 +54,7 @@ The `work-entry` command checks for existing or locked entries for its project, 
 
 ### Live thread time
 
-With a current OMP Project Time collector installed, Worklog shows one normal-contrast status line for the current top-level thread and project. **Dev** is observed prompt-active time; **Agent** is observed agent-run elapsed time. Each includes hours, minutes, and seconds. A paused developer window does not stop an ongoing agent run. These are independent evidence counters, not a combined total, desk-time certification, cost estimate, or billing approval.
+With a current OMP Project Time collector installed, Worklog shows one normal-contrast status line for the current top-level thread and project. **Dev** is observed prompt-active time; **Agent** is observed agent-run elapsed time. Durations use `H:MM:SS`; long project labels are shortened so both counters remain readable at ordinary terminal widths. A paused developer window does not stop an ongoing agent run. These are independent evidence counters, not a combined total, desk-time certification, cost estimate, or billing approval.
 
 Worklog receives versioned live snapshots from Project Time through OMP's extension event bus. It does not run a second activity clock or alter the evidence ledger. Project Time hides its standalone status while Worklog owns presentation, and keeps its standalone display when Worklog is absent. Missing or incompatible live evidence shows unavailable counters rather than fabricated zero hours.
 
