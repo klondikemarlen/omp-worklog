@@ -14,6 +14,7 @@ import {
   resolveProjectTimeDate,
 } from "./project-time.js"
 import { createWorklogTools, runWorklogAction } from "./worklog-workflow.js"
+import { registerLiveWorklogStatus } from "./live-status.js"
 
 function normalizeHolidayRegions(regions) {
   return [...new Set(regions.map(region => region.trim().toLowerCase()).filter(Boolean))]
@@ -545,6 +546,7 @@ export default async function ompWorklogExtension(pi, options = {}) {
   const settings = pi.cwd ? await loadSettings(pi.cwd) : {}
   options = { ...settings, ...options }
   pi.setLabel?.("OMP Worklog")
+  registerLiveWorklogStatus(pi)
   const command = normalizeCommand(options.command)
   const projectTimeMappings = options.projectTimeMappings?.trim() || "{}"
   const projectTimeLogPath = options.projectTimeLogPath?.trim() || ""
