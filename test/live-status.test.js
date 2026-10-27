@@ -43,10 +43,10 @@ test("when human activity expires, the independent agent duration remains visibl
   publish({})
   // Assert
   const status = statuses.get("omp-worklog-time")
-  assert.match(status, /Dev 0h 05m 00s \(paused\)/)
-  assert.match(status, /Agent 1h 02m 03s \(running\)/)
+  assert.match(status, /Dev 0:05:00 paused/)
+  assert.match(status, /Agent 1:02:03 running/)
   publish({ observedAtMs: 200, agentMilliseconds: 3783000, agentActive: false })
-  assert.match(statuses.get("omp-worklog-time"), /Agent 1h 03m 03s$/)
+  assert.match(statuses.get("omp-worklog-time"), /Agent 1:03:03$/)
 })
 
 test("when threads switch, late snapshots cannot overwrite the new thread", () => {
@@ -60,7 +60,7 @@ test("when threads switch, late snapshots cannot overwrite the new thread", () =
   // Assert
   assert.match(statuses.get("omp-worklog-time"), /Dev unavailable · Agent unavailable$/)
   publish({ sessionId: "thread-b", project: "other", observedAtMs: 300, humanMilliseconds: 2000 })
-  assert.match(statuses.get("omp-worklog-time"), /other · this thread · Dev 0h 00m 02s/)
+  assert.match(statuses.get("omp-worklog-time"), /other · thread · Dev 0:00:02/)
 })
 
 test("when evidence arrives out of order, the current project remains visible", () => {
@@ -107,4 +107,14 @@ test("when a session is a subagent, it never displays parent evidence", () => {
   publish({ sessionId: "child" })
   // Assert
   assert.equal(statuses.get("omp-worklog-time"), undefined)
+})
+
+test("when a project label is long, both source counters fit an 80-column status line", () => {
+  // Arrange
+  const { handlers, statuses, context, publish } = setup()
+  handlers.get("session_start")({}, context("thread-a"))
+  // Act
+  publish({ project: "a-project-with-a-long-repository-name" })
+  // Assert
+  assert.match(statuses.get("omp-worklog-time").slice(0, 80), /Dev 0:05:00 paused · Agent 1:02:03 running/)
 })
