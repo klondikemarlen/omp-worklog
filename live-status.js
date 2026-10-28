@@ -3,20 +3,30 @@ const LIVE_EVENT = "omp-project-time:live"
 const REQUEST_EVENT = "omp-project-time:live-request"
 
 function durationText(milliseconds) {
-  const seconds = Math.floor(milliseconds / 1000)
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`
+  const hours = milliseconds / 3_600_000
+  const rounded = hours.toFixed(1).replace(/\.0$/, "")
+  return hours > 0 && rounded === "0" ? "<0.1h" : `${rounded}h`
 }
 
 function isDuration(value) {
   return typeof value === "number" && Number.isFinite(value) && value >= 0
 }
 
-function projectText(project) {
-  if (typeof project !== "string" || project.trim() === "") return "unknown project"
-  const label = project.replace(/[\x00-\x1f\x7f-\x9f]/g, " ")
-  return label.length > 16 ? `${label.slice(0, 15)}…` : label
+function contextText(project, activity, budget) {
+  const clean = value => typeof value === "string" ? value.replace(/[\x00-\x1f\x7f-\x9f]/g, " ").trim() : ""
+  const label = [clean(project), clean(activity)].filter(Boolean).join("/")
+  if (!label || budget < 2) return ""
+  return label.length > budget ? `${label.slice(0, budget - 1)}…` : label
+}
+
+function hasDailyEvidence(snapshot) {
+  const dayStart = new Date(snapshot.observedAtMs)
+  dayStart.setHours(0, 0, 0, 0)
+  return snapshot.version === 1 && snapshot.dayStartAtMs === dayStart.getTime() &&
+    isDuration(snapshot.humanMilliseconds) && isDuration(snapshot.agentMilliseconds) &&
+    isDuration(snapshot.todayHumanMilliseconds) && isDuration(snapshot.todayAgentMilliseconds) &&
+    snapshot.todayHumanMilliseconds <= snapshot.humanMilliseconds &&
+    snapshot.todayAgentMilliseconds <= snapshot.agentMilliseconds
 }
 
 export function registerLiveWorklogStatus(pi) {
@@ -44,7 +54,7 @@ export function registerLiveWorklogStatus(pi) {
     context = ctx
     sessionId = ctx.sessionManager.getSessionId()
     observedAtMs = -Infinity
-    ctx.ui.setStatus(STATUS_KEY, "Worklog · this thread · Dev unavailable · Agent unavailable")
+    ctx.ui.setStatus(STATUS_KEY, "Dev unavailable · Agent unavailable")
     pi.events.emit(REQUEST_EVENT, { sessionId, presentation: "worklog" })
   }
 
@@ -52,16 +62,16 @@ export function registerLiveWorklogStatus(pi) {
     if (!context || !snapshot || snapshot.sessionId !== sessionId || context.sessionManager.getSessionId() !== sessionId) return
     if (!Number.isFinite(snapshot.observedAtMs) || snapshot.observedAtMs < observedAtMs) return
     observedAtMs = snapshot.observedAtMs
-    const prefix = `Worklog · ${projectText(snapshot.project)} · thread`
-    if (snapshot.version !== 1 || !isDuration(snapshot.humanMilliseconds) || !isDuration(snapshot.agentMilliseconds) ||
-        typeof snapshot.humanActive !== "boolean" || typeof snapshot.agentActive !== "boolean") {
-      context.ui.setStatus(STATUS_KEY, `${prefix} · Dev unavailable · Agent unavailable`)
+    if (!hasDailyEvidence(snapshot)) {
+      context.ui.setStatus(STATUS_KEY, "Dev unavailable · Agent unavailable")
       return
     }
-    const developer = `${durationText(snapshot.humanMilliseconds)}${snapshot.humanActive ? "" : " paused"}`
-    const agent = `${durationText(snapshot.agentMilliseconds)}${snapshot.agentActive ? " running" : ""}`
-    // Plain text uses the normal theme foreground; the entire line must not be dimmed.
-    context.ui.setStatus(STATUS_KEY, `${prefix} · Dev ${developer} · Agent ${agent}`)
+    const developer = `${durationText(snapshot.todayHumanMilliseconds)} / ${durationText(snapshot.humanMilliseconds)} total`
+    const agent = `${durationText(snapshot.todayAgentMilliseconds)} / ${durationText(snapshot.agentMilliseconds)} total`
+    const summary = `Dev ${developer} · Agent ${agent}`
+    const label = contextText(snapshot.project, snapshot.activity, 80 - summary.length - 3)
+    // Prioritize hours; the host may truncate the less important trailing context.
+    context.ui.setStatus(STATUS_KEY, label ? `${summary} — ${label}` : summary)
   })
 
   pi.on("session_start", request)

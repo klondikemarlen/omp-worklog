@@ -6,6 +6,8 @@ import { registerLiveWorklogStatus } from "../live-status.js"
 
 function setup() {
   const emitter = new EventEmitter()
+  const dayStart = new Date(0)
+  dayStart.setHours(0, 0, 0, 0)
   const handlers = new Map()
   const statuses = new Map()
   const events = {
@@ -25,28 +27,36 @@ function setup() {
     version: 1,
     sessionId: "thread-a",
     project: "worklog",
-    humanMilliseconds: 300000,
-    agentMilliseconds: 3723000,
-    humanActive: false,
-    agentActive: true,
+    activity: "implementation",
+    humanMilliseconds: 7 * 3_600_000,
+    agentMilliseconds: 100 * 3_600_000,
+    todayHumanMilliseconds: 7 * 3_600_000,
+    todayAgentMilliseconds: 15 * 3_600_000,
+    dayStartAtMs: dayStart.getTime(),
     observedAtMs: 100,
     ...data,
   })
   return { handlers, statuses, context, publish }
 }
 
-test("when human activity expires, the independent agent duration remains visible", () => {
+test("when daily and retained durations differ, both source-specific totals remain visible", () => {
   // Arrange
   const { handlers, statuses, context, publish } = setup()
-  // Act
   handlers.get("session_start")({}, context("thread-a"))
+  // Act
   publish({})
   // Assert
-  const status = statuses.get("omp-worklog-time")
-  assert.match(status, /Dev 0:05:00 paused/)
-  assert.match(status, /Agent 1:02:03 running/)
-  publish({ observedAtMs: 200, agentMilliseconds: 3783000, agentActive: false })
-  assert.match(statuses.get("omp-worklog-time"), /Agent 1:03:03$/)
+  assert.equal(statuses.get("omp-worklog-time"), "Dev 7h / 7h total · Agent 15h / 100h total — worklog/implementation")
+})
+
+test("when duration contains fractional hours, decimals are rounded without hiding positive evidence", () => {
+  // Arrange
+  const { handlers, statuses, context, publish } = setup()
+  handlers.get("session_start")({}, context("thread-a"))
+  // Act
+  publish({ todayHumanMilliseconds: 30000, humanMilliseconds: 7.25 * 3_600_000, todayAgentMilliseconds: 0, agentMilliseconds: 0 })
+  // Assert
+  assert.match(statuses.get("omp-worklog-time"), /^Dev <0\.1h \/ 7\.3h total · Agent 0h \/ 0h total/)
 })
 
 test("when threads switch, late snapshots cannot overwrite the new thread", () => {
@@ -58,9 +68,9 @@ test("when threads switch, late snapshots cannot overwrite the new thread", () =
   handlers.get("session_switch")({}, context("thread-b"))
   publish({ observedAtMs: 200 })
   // Assert
-  assert.match(statuses.get("omp-worklog-time"), /Dev unavailable · Agent unavailable$/)
-  publish({ sessionId: "thread-b", project: "other", observedAtMs: 300, humanMilliseconds: 2000 })
-  assert.match(statuses.get("omp-worklog-time"), /other · thread · Dev 0:00:02/)
+  assert.equal(statuses.get("omp-worklog-time"), "Dev unavailable · Agent unavailable")
+  publish({ sessionId: "thread-b", project: "other", observedAtMs: 300, todayHumanMilliseconds: 2 * 3_600_000 })
+  assert.match(statuses.get("omp-worklog-time"), /^Dev 2h \/ 7h total .* — other\/implementation$/)
 })
 
 test("when evidence arrives out of order, the current project remains visible", () => {
@@ -74,17 +84,17 @@ test("when evidence arrives out of order, the current project remains visible", 
   assert.match(statuses.get("omp-worklog-time"), /new-project/)
 })
 
-test("when evidence is unsupported or unavailable, previous totals are cleared", () => {
+test("when daily evidence is absent or belongs to another local day, retained totals are not relabelled as today", () => {
   // Arrange
   const { handlers, statuses, context, publish } = setup()
   handlers.get("session_start")({}, context("thread-a"))
   publish({})
   // Act
-  publish({ observedAtMs: 200, version: 2 })
+  publish({ observedAtMs: 200, todayHumanMilliseconds: undefined })
   // Assert
-  assert.match(statuses.get("omp-worklog-time"), /Dev unavailable · Agent unavailable$/)
-  publish({ observedAtMs: 300, humanMilliseconds: undefined, agentMilliseconds: undefined })
-  assert.match(statuses.get("omp-worklog-time"), /Dev unavailable · Agent unavailable$/)
+  assert.equal(statuses.get("omp-worklog-time"), "Dev unavailable · Agent unavailable")
+  publish({ observedAtMs: 300, dayStartAtMs: -1 })
+  assert.equal(statuses.get("omp-worklog-time"), "Dev unavailable · Agent unavailable")
 })
 
 test("when a session shuts down, later evidence cannot restore its display", () => {
@@ -109,12 +119,12 @@ test("when a session is a subagent, it never displays parent evidence", () => {
   assert.equal(statuses.get("omp-worklog-time"), undefined)
 })
 
-test("when a project label is long, both source counters fit an 80-column status line", () => {
+test("when trailing context is long, both daily and retained counters fit before it", () => {
   // Arrange
   const { handlers, statuses, context, publish } = setup()
   handlers.get("session_start")({}, context("thread-a"))
   // Act
-  publish({ project: "a-project-with-a-long-repository-name" })
+  publish({ project: "a-project-with-a-long-repository-name", activity: "a long activity description" })
   // Assert
-  assert.match(statuses.get("omp-worklog-time").slice(0, 80), /Dev 0:05:00 paused · Agent 1:02:03 running/)
+  assert.match(statuses.get("omp-worklog-time").slice(0, 80), /^Dev 7h \/ 7h total · Agent 15h \/ 100h total — /)
 })
