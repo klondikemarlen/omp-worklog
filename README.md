@@ -60,6 +60,8 @@ Worklog receives versioned live snapshots from Project Time through OMP's extens
 
 The scope is this thread's current project, not all threads or today's entire project total. Use `/worklog stats today --project PROJECT` for daily evidence and `/worklog review` for reviewed records. Restart OMP after installing both releases; an already-running process keeps its startup-loaded extensions.
 
+The time line is enabled by default. To hide it, run `omp plugin config set omp-worklog showTimeStatus false` and restart OMP. Set it to `true` and restart to restore the display. Hiding the line does not stop evidence collection, disable Worklog commands, or bring back Project Time's standalone line while Worklog is loaded.
+
 ### Project Time timesheets
 
 `/worklog timesheet DATE` reads local `human_active` Project Time evidence and produces one review-only draft for every local project active on that day. It does not call Harvest or require Harvest credentials.
@@ -109,6 +111,7 @@ See [reviewed concurrent worklogs](/docs/billing.md) for the policy, review fiel
 
 Worklog resolves persisted user settings and project overrides through the supported `omp plugin config list omp-worklog --json` command at initialization, using the OMP project cwd. Project values override user values; explicit factory options override both for programmatic callers and tests. Resolution runs once before commands and tools register; restart or reload the extension after changing settings. A resolution failure reports a diagnostic instead of silently using the wrong destination.
 
+- `showTimeStatus`: whether the time status is visible; defaults to `true`. Set `false` to hide it without stopping collection.
 - `defaultHours`: hours per business day when a time-off tool call omits `hours`; defaults to `7`.
 - `holidayRegions`: comma-separated Holidays regions; defaults to `ca_yt`.
 - `command`: direct path to the `omp-worklog` executable.
@@ -145,6 +148,11 @@ For independent comparison with manually recorded Harvest entries, follow the [p
 Version `0.14.0` is a clean identity cutover. Uninstall the retired `harvest-worklog` gem and OMP plugin, then install `omp-worklog`; replace former `harvest-worklog` CLI and `/harvest-worklog` command invocations with `omp-worklog` and `/omp-worklog`. The retired package, executable, command, tools, module, and settings aliases are not retained.
 
 Version `0.14.3` renames the OMP slash command from `/omp-worklog` to `/worklog`; the `omp-worklog` package identity and CLI executable are unchanged.
+
+## Changes in 0.19.1
+
+- Make the time line enabled by default and disableable through Worklog's `showTimeStatus` setting.
+- Keep collection and commands available while hidden, without restoring the collector's old status line.
 
 ## Changes in 0.19.0
 
