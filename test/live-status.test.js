@@ -4,7 +4,7 @@ import test from "node:test"
 
 import { registerLiveWorklogStatus } from "../live-status.js"
 
-function setup() {
+function setup(options = {}) {
   const emitter = new EventEmitter()
   const dayStart = new Date(0)
   dayStart.setHours(0, 0, 0, 0)
@@ -17,7 +17,7 @@ function setup() {
       return () => emitter.off(channel, handler)
     },
   }
-  registerLiveWorklogStatus({ events, on: (event, handler) => handlers.set(event, handler) })
+  registerLiveWorklogStatus({ events, on: (event, handler) => handlers.set(event, handler) }, options)
   const context = (id, parentSession) => ({
     hasUI: true,
     sessionManager: { getSessionId: () => id, getHeader: () => ({ parentSession }) },
@@ -127,4 +127,16 @@ test("when trailing context is long, both daily and retained counters fit before
   publish({ project: "a-project-with-a-long-repository-name", activity: "a long activity description" })
   // Assert
   assert.match(statuses.get("omp-worklog-time").slice(0, 80), /^Dev 7h \/ 7h total · Agent 15h \/ 100h total — /)
+})
+
+test("when time status is disabled, evidence and thread switches do not restore the line", () => {
+  // Arrange
+  const { handlers, statuses, context, publish } = setup({ enabled: false })
+  // Act
+  handlers.get("session_start")({}, context("thread-a"))
+  publish({})
+  handlers.get("session_switch")({}, context("thread-b"))
+  publish({ sessionId: "thread-b", observedAtMs: 200 })
+  // Assert
+  assert.equal(statuses.get("omp-worklog-time"), undefined)
 })
