@@ -52,6 +52,14 @@ The `omp_worklog_record_time_off` OMP tool accepts the same name pair or ID pair
 
 The `work-entry` command checks for existing or locked entries for its project, task, and date before creating a new duration entry. Use `--dry-run` to complete that preflight without a write.
 
+### Live thread time
+
+With OMP Project Time 9.6.0 or newer installed, Worklog shows one normal-contrast status line for the current top-level thread and project. **Dev** is observed prompt-active time; **Agent** is observed agent-run elapsed time. Durations use `H:MM:SS`; long project labels are shortened so both counters remain readable at ordinary terminal widths. A paused developer window does not stop an ongoing agent run. These are independent evidence counters, not a combined total, desk-time certification, cost estimate, or billing approval.
+
+Worklog receives versioned live snapshots from Project Time through OMP's extension event bus. It does not run a second activity clock or alter the evidence ledger. Project Time hides its standalone status while Worklog owns presentation, and keeps its standalone display when Worklog is absent. Missing or incompatible live evidence shows unavailable counters rather than fabricated zero hours.
+
+The scope is this thread's current project, not all threads or today's entire project total. Use `/worklog stats today --project PROJECT` for daily evidence and `/worklog review` for reviewed records. Restart OMP after installing both releases; an already-running process keeps its startup-loaded extensions.
+
 ### Project Time timesheets
 
 `/worklog timesheet DATE` reads local `human_active` Project Time evidence and produces one review-only draft for every local project active on that day. It does not call Harvest or require Harvest credentials.
@@ -137,6 +145,12 @@ For independent comparison with manually recorded Harvest entries, follow the [p
 Version `0.14.0` is a clean identity cutover. Uninstall the retired `harvest-worklog` gem and OMP plugin, then install `omp-worklog`; replace former `harvest-worklog` CLI and `/harvest-worklog` command invocations with `omp-worklog` and `/omp-worklog`. The retired package, executable, command, tools, module, and settings aliases are not retained.
 
 Version `0.14.3` renames the OMP slash command from `/omp-worklog` to `/worklog`; the `omp-worklog` package identity and CLI executable are unchanged.
+
+## Changes in 0.18.0
+
+- Show normal-contrast current-thread/project developer and agent time in one Worklog status line.
+- Consume Project Time's live observation contract without duplicating clocks or mixing the two evidence sources.
+- Clear stale counters across session changes and show unavailable evidence explicitly.
 
 ## Changes in 0.17.0
 

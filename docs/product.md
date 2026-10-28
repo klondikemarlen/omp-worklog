@@ -12,6 +12,7 @@ The current package provides:
 2. Configurable projections from local projects to Harvest destinations.
 3. Private concurrent-project review batches: within-project overlap is merged, cross-project overlap is retained, and inferred response gaps use a five-minute default grace.
 4. Explicit time-off, ordinary-work, and reviewed-batch Harvest writes through the Ruby adapter, with OMP approval surfaces.
+5. A readable current-thread/project status with separate developer prompt-active and agent elapsed durations, supplied by Project Time rather than collected again.
 
 Reading evidence and preparing candidates need no Harvest credentials. Batch preflight reads Harvest; submission creates entries only after review and explicit approval. There is no unattended scheduler.
 
@@ -36,6 +37,7 @@ The reviewed-batch integration writes approved records to Harvest without making
 - Keep the local project/task/duration record useful when no external mapping exists.
 - Support legitimate concurrent-project value without imposing a global wall-clock billing cap.
 - Keep source observations, inferred candidates, and approved durations visibly distinct.
+- Live status uses normal foreground contrast and names its thread/project scope. It never combines developer and agent durations or treats a paused human window as an ended agent run.
 
 ## Non-goals for the Current Release
 

@@ -24,6 +24,7 @@ Private review batches persist candidate and reviewer-adjusted durations outside
 | --- | --- | --- |
 | `project-time.js` | Evidence loading, filtering, grouping, mapping projection, drafts, and timesheet formatting | Source comments and `test/project-time.test.js` |
 | `index.js` | OMP command, completion, tool registration, interactive summary lifecycle, and CLI invocation | Source comments and `test/omp-plugin.test.js` |
+| `live-status.js` | Current-thread/project live snapshot validation, readable separate developer/agent counters, and presentation handoff | `test/live-status.test.js` |
 | `project-time-report.js` | Source-separated daily analytics, same-session gap inference, independent project candidates, and review-batch records | `test/project-time-report.test.js` |
 | `worklog-workflow.js` | Private batch preparation, OMP review/approval orchestration, and structured CLI submission | `test/worklog-workflow.test.js` |
 | `daily-review.js` | Native daily review interactions, edit/review invalidation, exclusion, and submission readiness | `test/daily-review.test.js` |
@@ -34,6 +35,8 @@ Private review batches persist candidate and reviewer-adjusted durations outside
 ## Design Constraint
 
 Local analytics and review preparation remain useful without Harvest credentials, assignments, or network access. Source observations, policy candidates, approved work-log records, and destination receipts are distinct boundaries. The provider consumes a reviewed record; it must not become the source of the original evidence.
+
+Live presentation uses OMP's shared extension event bus rather than another collector. Worklog requests `omp-project-time:live-request` with `{ sessionId, presentation: "worklog" }`; Project Time emits `omp-project-time:live` v1 snapshots containing `sessionId`, sanitized `project`, `observedAtMs`, `humanMilliseconds`, `agentMilliseconds`, `humanActive`, and `agentActive`. A release request omits `presentation`. Source durations remain independent and scoped to the exact session/project. Missing durations indicate unavailable evidence, not zero. Worklog rejects mismatched sessions, older observations, and unsupported/invalid snapshots; shutdown releases presentation and removes its subscription.
 
 ## Runtime and Language Boundaries
 
