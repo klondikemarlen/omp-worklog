@@ -38,6 +38,8 @@ Local analytics and review preparation remain useful without Harvest credentials
 
 Live presentation uses OMP's shared extension event bus rather than another collector. Worklog requests `omp-project-time:live-request` with `{ sessionId, presentation: "worklog" }`; Project Time emits `omp-project-time:live` v1 snapshots containing `sessionId`, sanitized `project`, `observedAtMs`, retained `humanMilliseconds`/`agentMilliseconds`, and source-active flags. Version 9.7 adds `todayHumanMilliseconds`, `todayAgentMilliseconds`, `dayStartAtMs` (local midnight), and optional recorded `activity`. A release request omits `presentation`. Source durations remain independent and scoped to the exact session/project. Worklog requires valid daily evidence consistent with the observation's local day; missing values mean unavailable, not zero or lifetime hours. It rejects mismatched sessions, older observations, and unsupported/invalid snapshots; shutdown releases presentation and removes its subscription.
 
+`showTimeStatus` defaults to true and uses the same host-resolved settings and explicit factory precedence as other Worklog options. When false, Worklog clears its status key but keeps the presentation claim, so the collector does not restore its legacy line. Snapshots and recording continue independently of visibility.
+
 ## Runtime and Language Boundaries
 
 JavaScript runs inside OMP and owns local SQLite/JSON evidence, completion, deterministic transforms, and advisory summaries. Ruby owns the standalone Harvest CLI and uses `marlens-harvest-api-v2`, `business_time`, and `holidays` for destination access and business-day rules. The OMP write tool invokes the executable with argument arrays rather than shell interpolation.

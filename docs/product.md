@@ -38,6 +38,7 @@ The reviewed-batch integration writes approved records to Harvest without making
 - Support legitimate concurrent-project value without imposing a global wall-clock billing cap.
 - Keep source observations, inferred candidates, and approved durations visibly distinct.
 - Live status uses normal foreground contrast and prioritizes local-day/retained source durations over identity, state labels, or seconds. Project/activity appears only as trailing context. It never combines developer and agent hours or silently broadens thread/project scope.
+- The time line is enabled by default and optional through Worklog's `showTimeStatus`; hiding presentation does not stop source collection or restore a duplicate collector line.
 
 ## Non-goals for the Current Release
 

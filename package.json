@@ -1,6 +1,6 @@
 {
   "name": "omp-worklog",
-  "version": "0.19.0",
+  "version": "0.19.1",
   "description": "Concurrent-project work logs with reviewed, safe Harvest batch filing.",
   "type": "module",
   "license": "MIT",
@@ -23,6 +23,11 @@
       "./index.js"
     ],
     "settings": {
+      "showTimeStatus": {
+        "type": "boolean",
+        "default": true,
+        "description": "Show today's and retained developer/agent hours. Disable to hide the time line without stopping evidence collection."
+      },
       "defaultHours": {
         "type": "number",
         "default": 7,

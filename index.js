@@ -546,7 +546,7 @@ export default async function ompWorklogExtension(pi, options = {}) {
   const settings = pi.cwd ? await loadSettings(pi.cwd) : {}
   options = { ...settings, ...options }
   pi.setLabel?.("OMP Worklog")
-  registerLiveWorklogStatus(pi)
+  registerLiveWorklogStatus(pi, { enabled: options.showTimeStatus !== false })
   const command = normalizeCommand(options.command)
   const projectTimeMappings = options.projectTimeMappings?.trim() || "{}"
   const projectTimeLogPath = options.projectTimeLogPath?.trim() || ""

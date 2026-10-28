@@ -29,7 +29,7 @@ function hasDailyEvidence(snapshot) {
     snapshot.todayAgentMilliseconds <= snapshot.agentMilliseconds
 }
 
-export function registerLiveWorklogStatus(pi) {
+export function registerLiveWorklogStatus(pi, { enabled = true } = {}) {
   if (typeof pi.on !== "function" || !pi.events?.on || !pi.events?.emit) return
 
   let context
@@ -54,11 +54,12 @@ export function registerLiveWorklogStatus(pi) {
     context = ctx
     sessionId = ctx.sessionManager.getSessionId()
     observedAtMs = -Infinity
-    ctx.ui.setStatus(STATUS_KEY, "Dev unavailable · Agent unavailable")
+    ctx.ui.setStatus(STATUS_KEY, enabled ? "Dev unavailable · Agent unavailable" : undefined)
     pi.events.emit(REQUEST_EVENT, { sessionId, presentation: "worklog" })
   }
 
   const unsubscribe = pi.events.on(LIVE_EVENT, snapshot => {
+    if (!enabled) return
     if (!context || !snapshot || snapshot.sessionId !== sessionId || context.sessionManager.getSessionId() !== sessionId) return
     if (!Number.isFinite(snapshot.observedAtMs) || snapshot.observedAtMs < observedAtMs) return
     observedAtMs = snapshot.observedAtMs
