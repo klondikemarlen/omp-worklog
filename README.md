@@ -54,9 +54,9 @@ The `work-entry` command checks for existing or locked entries for its project, 
 
 ### Live thread time
 
-With OMP Project Time 9.6.0 or newer installed, Worklog shows one normal-contrast status line for the current top-level thread and project. **Dev** is observed prompt-active time; **Agent** is observed agent-run elapsed time. Durations use `H:MM:SS`; long project labels are shortened so both counters remain readable at ordinary terminal widths. A paused developer window does not stop an ongoing agent run. These are independent evidence counters, not a combined total, desk-time certification, cost estimate, or billing approval.
+With OMP Project Time 9.7.0 or newer installed, Worklog shows `Dev TODAY / TOTAL total · Agent TODAY / TOTAL total — project/activity` in normal foreground contrast. The first value is the current local calendar day's observed hours; the second is retained history for this thread and project. **Dev** is prompt-active evidence; **Agent** is agent-run elapsed evidence. Decimal hours use at most one decimal place, omit `.0`, and show positive durations below the rounding threshold as `<0.1h`. Trailing context is shortened before either source's hour values. The display omits seconds, plugin/thread labels, and running/paused markers.
 
-Worklog receives versioned live snapshots from Project Time through OMP's extension event bus. It does not run a second activity clock or alter the evidence ledger. Project Time hides its standalone status while Worklog owns presentation, and keeps its standalone display when Worklog is absent. Missing or incompatible live evidence shows unavailable counters rather than fabricated zero hours.
+Worklog receives versioned live snapshots from Project Time through OMP's extension event bus. It does not run a second activity clock or alter the evidence ledger. Project Time hides its standalone status while Worklog owns presentation, and keeps its standalone display when Worklog is absent. Missing or incompatible daily evidence shows unavailable counters, never lifetime hours relabelled as today. Developer and agent observations remain separate, not a combined total, desk-time certification, cost estimate, or billing approval.
 
 The scope is this thread's current project, not all threads or today's entire project total. Use `/worklog stats today --project PROJECT` for daily evidence and `/worklog review` for reviewed records. Restart OMP after installing both releases; an already-running process keeps its startup-loaded extensions.
 
@@ -145,6 +145,12 @@ For independent comparison with manually recorded Harvest entries, follow the [p
 Version `0.14.0` is a clean identity cutover. Uninstall the retired `harvest-worklog` gem and OMP plugin, then install `omp-worklog`; replace former `harvest-worklog` CLI and `/harvest-worklog` command invocations with `omp-worklog` and `/omp-worklog`. The retired package, executable, command, tools, module, and settings aliases are not retained.
 
 Version `0.14.3` renames the OMP slash command from `/omp-worklog` to `/worklog`; the `omp-worklog` package identity and CLI executable are unchanged.
+
+## Changes in 0.19.0
+
+- Prioritize today's decimal developer/agent hours and retained totals in the compact status.
+- Move project/activity context to the end, removing plugin identity, thread labels, seconds, and running/paused markers.
+- Use local-calendar daily evidence, including midnight rollover, without broadening current-thread/project scope.
 
 ## Changes in 0.18.0
 
