@@ -264,7 +264,7 @@ class OmpWorklogTest < Minitest::Test
     assert_equal 0, OmpWorklog::WorkEntryCLI.run(implementation, client:)
     assert_equal 0, OmpWorklog::WorkEntryCLI.run(review, client:)
     assert_equal OmpWorklog::WorkEntryCLI::EXISTING_ENTRY, OmpWorklog::WorkEntryCLI.run(implementation, client:)
-    assert_equal ["OMP Project Time activity: \"implementation\"\nHarvest API (repo)", "OMP Project Time activity: \"review\"\nHarvest API (repo)"], client.entries.map { |entry| entry.fetch(:notes) }
+    assert_equal(["OMP Project Time activity: \"implementation\"\nHarvest API (repo)", "OMP Project Time activity: \"review\"\nHarvest API (repo)"], client.entries.map { |entry| entry.fetch(:notes) })
   end
 
 

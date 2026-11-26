@@ -206,6 +206,15 @@ Version `0.14.3` renames the OMP slash command from `/omp-worklog` to `/worklog`
 - Reject impossible calendar dates in transform ranges.
 - Document configuration activation limits, runtime ownership, and private calibration.
 
+## Lint changed files
+
+Install development dependencies with `npm ci` and `bundle install`. Pass the files you changed to the matching non-fixing checker:
+
+```sh
+npm exec -- oxlint test/live-status.test.js
+bundle exec rubocop lib/omp_worklog/version.rb
+```
+
 ## Release
 
 Before merging a release PR, self-review its complete diff, address every actionable review comment, and rerun focused QA after fixups. Record the review and QA evidence on the PR. Then merge to `main`, build and publish the Ruby gem, install the released OMP plugin from GitHub, and verify it:
