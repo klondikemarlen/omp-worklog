@@ -17,9 +17,10 @@ function activityText(activity) {
     return ""
   }
 
-  const text = activity.replace(/[\s\p{Cc}]+/gu, " ").trim()
+  const normalizedActivity = activity.replace(/[\s\p{Cc}]+/gu, " ").trim()
+
   // Project Time records release actions as plain words rather than a category field.
-  return text.replace(/^released ([^:]+)$/iu, "release: $1")
+  return normalizedActivity.replace(/^released ([^:]+)$/iu, "release: $1")
 }
 
 function hasDailyEvidence(snapshot) {
