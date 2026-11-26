@@ -400,11 +400,6 @@ export function createProjectTimeProjectNamesLoader({ read = readFileSync, stat 
   }
 }
 
-function hasFlagValue(words, flag) {
-  const index = words.indexOf(flag)
-  return index >= 0 && Boolean(words[index + 1]) && !words[index + 1].startsWith("--")
-}
-
 export function parseCommandArguments(input) {
   const words = []
   let word = ""

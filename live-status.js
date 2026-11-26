@@ -13,7 +13,7 @@ function isDuration(value) {
 }
 
 function contextText(project, activity, budget) {
-  const clean = value => typeof value === "string" ? value.replace(/[\x00-\x1f\x7f-\x9f]/g, " ").trim() : ""
+  const clean = value => typeof value === "string" ? value.replace(/\p{Cc}/gu, " ").trim() : ""
   const label = [clean(project), clean(activity)].filter(Boolean).join("/")
   if (!label || budget < 2) return ""
   return label.length > budget ? `${label.slice(0, budget - 1)}…` : label

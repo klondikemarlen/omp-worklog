@@ -76,10 +76,7 @@ module OmpWorklog
 
       emit_result(result)
       successful_result?(result) ? 0 : 1
-    rescue InputError => error
-      emit_failure(@dry_run ? "preflight" : "submit", error.code)
-      1
-    rescue ProviderFailure => error
+    rescue InputError, ProviderFailure => error
       emit_failure(@dry_run ? "preflight" : "submit", error.code)
       1
     rescue OptionParser::ParseError
@@ -545,7 +542,8 @@ module OmpWorklog
     end
 
     def numeric_hours?(hours, milliseconds)
-      hours.is_a?(Numeric) && hours == milliseconds / 3_600_000.0
+      # A near match must not reconcile a different provider entry.
+      hours.is_a?(Numeric) && hours == milliseconds / 3_600_000.0 # rubocop:disable Lint/FloatComparison
     end
 
     def id_string(value)
