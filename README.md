@@ -54,7 +54,7 @@ The `work-entry` command checks for existing or locked entries for its project, 
 
 ### Live thread time
 
-With OMP Project Time 9.7.0 or newer installed, Worklog shows `Dev TODAY / TOTAL total · Agent TODAY / TOTAL total — project/activity` in normal foreground contrast. The first value is the current local calendar day's observed hours; the second is retained history for this thread and project. **Dev** is prompt-active evidence; **Agent** is agent-run elapsed evidence. Decimal hours use at most one decimal place, omit `.0`, and show positive durations below the rounding threshold as `<0.1h`. Trailing context is shortened before either source's hour values. The display omits seconds, plugin/thread labels, and running/paused markers.
+With OMP Project Time 9.7.0 or newer installed, Worklog shows separate Dev and Agent counters. Each shows today’s hours and the retained total for this thread and project. **Dev** measures prompt-active time; **Agent** measures agent-run elapsed time. Values use at most one decimal place and show positive durations below the rounding threshold as `<0.1h`.
 
 Worklog receives versioned live snapshots from Project Time through OMP's extension event bus. It does not run a second activity clock or alter the evidence ledger. Project Time hides its standalone status while Worklog owns presentation, and keeps its standalone display when Worklog is absent. Missing or incompatible daily evidence shows unavailable counters, never lifetime hours relabelled as today. Developer and agent observations remain separate, not a combined total, desk-time certification, cost estimate, or billing approval.
 
