@@ -15,8 +15,8 @@ function isDuration(value) {
 function activityText(activity) {
   if (typeof activity !== "string") return ""
   const text = activity.replace(/[\s\x00-\x1f\x7f-\x9f]+/gu, " ").trim()
-  if (!text) return ""
-  return /^[^:]+: \S/u.test(text) ? text : `activity: ${text}`
+  // Project Time records release actions as plain words rather than a category field.
+  return text.replace(/^released ([^:]+)$/iu, "release: $1")
 }
 
 function hasDailyEvidence(snapshot) {
