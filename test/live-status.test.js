@@ -130,11 +130,14 @@ test("when trailing context is long, both daily and retained counters fit before
 })
 
 test("when no activity is recorded, the project is not substituted", () => {
+  // Arrange
   const { handlers, statuses, context, publish } = setup()
   handlers.get("session_start")({}, context("thread-a"))
 
+  // Act
   publish({ activity: undefined })
 
+  // Assert
   assert.equal(statuses.get("omp-worklog-time"), "Dev 7h / 7h total · Agent 15h / 100h total")
 })
 
