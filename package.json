@@ -1,6 +1,6 @@
 {
   "name": "omp-worklog",
-  "version": "0.19.1",
+  "version": "0.19.2",
   "description": "Concurrent-project work logs with reviewed, safe Harvest batch filing.",
   "type": "module",
   "license": "MIT",

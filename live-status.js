@@ -12,11 +12,11 @@ function isDuration(value) {
   return typeof value === "number" && Number.isFinite(value) && value >= 0
 }
 
-function contextText(project, activity, budget) {
-  const clean = value => typeof value === "string" ? value.replace(/[\x00-\x1f\x7f-\x9f]/g, " ").trim() : ""
-  const label = [clean(project), clean(activity)].filter(Boolean).join("/")
-  if (!label || budget < 2) return ""
-  return label.length > budget ? `${label.slice(0, budget - 1)}…` : label
+function activityText(activity) {
+  if (typeof activity !== "string") return ""
+  const text = activity.replace(/[\s\x00-\x1f\x7f-\x9f]+/gu, " ").trim()
+  if (!text) return ""
+  return /^[^:]+: \S/u.test(text) ? text : `activity: ${text}`
 }
 
 function hasDailyEvidence(snapshot) {
@@ -70,7 +70,7 @@ export function registerLiveWorklogStatus(pi, { enabled = true } = {}) {
     const developer = `${durationText(snapshot.todayHumanMilliseconds)} / ${durationText(snapshot.humanMilliseconds)} total`
     const agent = `${durationText(snapshot.todayAgentMilliseconds)} / ${durationText(snapshot.agentMilliseconds)} total`
     const summary = `Dev ${developer} · Agent ${agent}`
-    const label = contextText(snapshot.project, snapshot.activity, 80 - summary.length - 3)
+    const label = activityText(snapshot.activity)
     // Prioritize hours; the host may truncate the less important trailing context.
     context.ui.setStatus(STATUS_KEY, label ? `${summary} — ${label}` : summary)
   })

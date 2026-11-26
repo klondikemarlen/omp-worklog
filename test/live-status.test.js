@@ -27,7 +27,7 @@ function setup(options = {}) {
     version: 1,
     sessionId: "thread-a",
     project: "worklog",
-    activity: "implementation",
+    activity: "release: verify installed package",
     humanMilliseconds: 7 * 3_600_000,
     agentMilliseconds: 100 * 3_600_000,
     todayHumanMilliseconds: 7 * 3_600_000,
@@ -46,7 +46,7 @@ test("when daily and retained durations differ, both source-specific totals rema
   // Act
   publish({})
   // Assert
-  assert.equal(statuses.get("omp-worklog-time"), "Dev 7h / 7h total · Agent 15h / 100h total — worklog/implementation")
+  assert.equal(statuses.get("omp-worklog-time"), "Dev 7h / 7h total · Agent 15h / 100h total — release: verify installed package")
 })
 
 test("when duration contains fractional hours, decimals are rounded without hiding positive evidence", () => {
@@ -70,18 +70,18 @@ test("when threads switch, late snapshots cannot overwrite the new thread", () =
   // Assert
   assert.equal(statuses.get("omp-worklog-time"), "Dev unavailable · Agent unavailable")
   publish({ sessionId: "thread-b", project: "other", observedAtMs: 300, todayHumanMilliseconds: 2 * 3_600_000 })
-  assert.match(statuses.get("omp-worklog-time"), /^Dev 2h \/ 7h total .* — other\/implementation$/)
+  assert.match(statuses.get("omp-worklog-time"), /^Dev 2h \/ 7h total .* — release: verify installed package$/)
 })
 
-test("when evidence arrives out of order, the current project remains visible", () => {
+test("when evidence arrives out of order, the current activity remains visible", () => {
   // Arrange
   const { handlers, statuses, context, publish } = setup()
   handlers.get("session_start")({}, context("thread-a"))
   // Act
-  publish({ observedAtMs: 300, project: "new-project" })
-  publish({ observedAtMs: 100, project: "old-project" })
+  publish({ observedAtMs: 300, activity: "verify installation" })
+  publish({ observedAtMs: 100, activity: "prepare release" })
   // Assert
-  assert.match(statuses.get("omp-worklog-time"), /new-project/)
+  assert.match(statuses.get("omp-worklog-time"), / — activity: verify installation$/)
 })
 
 test("when daily evidence is absent or belongs to another local day, retained totals are not relabelled as today", () => {
@@ -124,9 +124,18 @@ test("when trailing context is long, both daily and retained counters fit before
   const { handlers, statuses, context, publish } = setup()
   handlers.get("session_start")({}, context("thread-a"))
   // Act
-  publish({ project: "a-project-with-a-long-repository-name", activity: "a long activity description" })
+  publish({ activity: "release: verify the installed package and its command completions" })
   // Assert
-  assert.match(statuses.get("omp-worklog-time").slice(0, 80), /^Dev 7h \/ 7h total · Agent 15h \/ 100h total — /)
+  assert.equal(statuses.get("omp-worklog-time"), "Dev 7h / 7h total · Agent 15h / 100h total — release: verify the installed package and its command completions")
+})
+
+test("when no activity is recorded, the project is not substituted", () => {
+  const { handlers, statuses, context, publish } = setup()
+  handlers.get("session_start")({}, context("thread-a"))
+
+  publish({ activity: undefined })
+
+  assert.equal(statuses.get("omp-worklog-time"), "Dev 7h / 7h total · Agent 15h / 100h total")
 })
 
 test("when time status is disabled, evidence and thread switches do not restore the line", () => {
