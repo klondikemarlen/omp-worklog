@@ -1,0 +1,7 @@
+AllCops:
+  DisabledByDefault: true
+  NewCops: enable
+  TargetRubyVersion: 3.2
+
+Lint:
+  Enabled: true

@@ -29,11 +29,11 @@ class BatchCLITest < Minitest::Test
       assert_equal 0, status
       assert_equal "complete", result.fetch("status")
       assert_equal "", error
-      assert_equal [2.0, 1.5], client.time_entries.map { |entry| entry.fetch("hours") }
-      assert_equal [101, 102], client.time_entries.map { |entry| entry.fetch("project_id") }
-      assert_equal [201, 202], client.time_entries.map { |entry| entry.fetch("task_id") }
-      assert_equal [41, 41], client.time_entries.map { |entry| entry.fetch("user_id") }
-      assert_equal entries.map { |entry| entry.fetch("id") }, client.time_entries.map { |entry| entry.dig("external_reference", "id") }
+      assert_equal([2.0, 1.5], client.time_entries.map { |entry| entry.fetch("hours") })
+      assert_equal([101, 102], client.time_entries.map { |entry| entry.fetch("project_id") })
+      assert_equal([201, 202], client.time_entries.map { |entry| entry.fetch("task_id") })
+      assert_equal([41, 41], client.time_entries.map { |entry| entry.fetch("user_id") })
+      assert_equal(entries.map { |entry| entry.fetch("id") }, client.time_entries.map { |entry| entry.dig("external_reference", "id") })
 
       receipt_path = Dir.glob(File.join(state_dir, "*.json")).fetch(0)
       receipt_document = JSON.parse(File.read(receipt_path))
@@ -55,7 +55,7 @@ class BatchCLITest < Minitest::Test
 
       assert_equal 1, status
       assert_equal "blocked", result.fetch("status")
-      assert_equal ["not_submitted", "blocked"], result.fetch("results").map { |item| item.fetch("status") }
+      assert_equal(["not_submitted", "blocked"], result.fetch("results").map { |item| item.fetch("status") })
       assert_equal "destination_unmapped", result.fetch("results").last.fetch("reason")
       assert_empty client.time_entries
       assert_equal 0, client.post_attempts
@@ -97,7 +97,7 @@ class BatchCLITest < Minitest::Test
       assert_equal 1, changed_status
       assert_equal "conflict", changed_result.fetch("results").first.fetch("status")
       assert_equal "external_reference_content_conflict", changed_result.fetch("results").first.fetch("reason")
-      assert_equal [1.0], client.time_entries.map { |remote_entry| remote_entry.fetch("hours") }
+      assert_equal([1.0], client.time_entries.map { |remote_entry| remote_entry.fetch("hours") })
       assert_equal 1, client.post_attempts
     end
   end
@@ -132,7 +132,7 @@ class BatchCLITest < Minitest::Test
       assert_equal "locked_or_running_entry", result.fetch("results").first.fetch("reason")
       assert_empty client.created_entries
       assert_equal 0, client.post_attempts
-      assert client.requests.any? { |request| request[:path] == "/v2/time_entries" && request[:params][:page] == 2 && !request[:params].key?(:external_reference_id) }
+      assert(client.requests.any? { |request| request[:path] == "/v2/time_entries" && request[:params][:page] == 2 && !request[:params].key?(:external_reference_id) })
     end
   end
 
@@ -154,8 +154,8 @@ class BatchCLITest < Minitest::Test
       assert_equal 0, status
       assert_equal "created", result.fetch("results").first.fetch("status")
       assert_equal 2, client.time_entries.length
-      assert_equal [98, 41], client.time_entries.map { |remote_entry| remote_entry.fetch("user_id") }
-      assert client.requests.any? { |request| request[:path] == "/v2/time_entries" && request[:params][:user_id] == 41 }
+      assert_equal([98, 41], client.time_entries.map { |remote_entry| remote_entry.fetch("user_id") })
+      assert(client.requests.any? { |request| request[:path] == "/v2/time_entries" && request[:params][:user_id] == 41 })
     end
   end
 
@@ -168,12 +168,12 @@ class BatchCLITest < Minitest::Test
       ]
       client = FakeHarvestClient.new(assignments:, assignment_page_size: 1)
 
-      status, result, = run_batch(client, review_batch([entry]), state_dir:)
+      status, = run_batch(client, review_batch([entry]), state_dir:)
 
       assert_equal 0, status
       assert_equal 102, client.created_entries.first.fetch("project_id")
       assert_equal 202, client.created_entries.first.fetch("task_id")
-      assert client.requests.any? { |request| request[:path] == "/v2/users/me/project_assignments" && request[:params][:page] == 2 }
+      assert(client.requests.any? { |request| request[:path] == "/v2/users/me/project_assignments" && request[:params][:page] == 2 })
     end
   end
 
@@ -257,8 +257,8 @@ class BatchCLITest < Minitest::Test
       assert_equal "ready", dry_run_result.fetch("status")
       assert_equal 0, submit_status
       assert_equal "created", submit_result.fetch("results").first.fetch("status")
-      assert_equal [4_200_000 / 3_600_000.0], client.created_entries.map { |filed| filed.fetch("hours") }
-      assert_equal ["Reviewed ordinary work"], client.created_entries.map { |filed| filed.fetch("notes") }
+      assert_equal([4_200_000 / 3_600_000.0], client.created_entries.map { |filed| filed.fetch("hours") })
+      assert_equal(["Reviewed ordinary work"], client.created_entries.map { |filed| filed.fetch("notes") })
       refute_includes JSON.generate(client.created_entries), "Corrected an undercount"
     end
   end
@@ -333,11 +333,11 @@ class BatchCLITest < Minitest::Test
       status, result, = run_batch(client, review_batch(entries), state_dir:)
 
       assert_equal 1, status
-      assert_equal ["conflict", "conflict"], result.fetch("results").map { |item| item.fetch("status") }
-      assert result.fetch("results").all? { |item| item.fetch("reason") == "duplicate_destination" }
+      assert_equal(["conflict", "conflict"], result.fetch("results").map { |item| item.fetch("status") })
+      assert(result.fetch("results").all? { |item| item.fetch("reason") == "duplicate_destination" })
       assert_empty client.created_entries
-      assert_equal 0, client.requests.count { |request| request[:method] == :post }
-      assert_equal 0, client.requests.count { |request| request[:path] == "/v2/time_entries" }
+      assert_equal(0, client.requests.count { |request| request[:method] == :post })
+      assert_equal(0, client.requests.count { |request| request[:path] == "/v2/time_entries" })
     end
   end
 
@@ -374,7 +374,7 @@ class BatchCLITest < Minitest::Test
 
       assert_equal 1, status
       assert_equal "uncertain", result.fetch("status")
-      assert_equal ["created", "uncertain", "not_submitted"], result.fetch("results").map { |item| item.fetch("status") }
+      assert_equal(["created", "uncertain", "not_submitted"], result.fetch("results").map { |item| item.fetch("status") })
       assert_equal 2, client.post_attempts
       assert_equal 2, client.created_entries.length
       receipts = receipt_document(state_dir).fetch("entries")
@@ -399,11 +399,11 @@ class BatchCLITest < Minitest::Test
       client = FakeHarvestClient.new(assignments:)
       client.reject_post_on(2)
 
-      status, result, error = run_batch(client, review_batch(entries), state_dir:)
+      status, result, = run_batch(client, review_batch(entries), state_dir:)
 
       assert_equal 1, status
       assert_equal "partial", result.fetch("status")
-      assert_equal ["created", "blocked", "not_submitted"], result.fetch("results").map { |item| item.fetch("status") }
+      assert_equal(["created", "blocked", "not_submitted"], result.fetch("results").map { |item| item.fetch("status") })
       assert_equal 2, client.post_attempts
       assert_equal 1, client.created_entries.length
       refute_includes JSON.generate(result), "provider secret"
@@ -451,6 +451,21 @@ class BatchCLITest < Minitest::Test
       assert_equal 1, client.post_attempts
       assert_empty client.created_entries
       assert_equal "uncertain", receipt_document(state_dir).dig("entries", entry.fetch("id"), "status")
+    end
+  end
+
+  def test_nearly_equal_remote_hours_do_not_reconcile
+    Dir.mktmpdir("batch-cli-") do |state_dir|
+      batch = review_batch([review_entry("Internal", "Internal", "Development", 3_600_000)])
+      client = FakeHarvestClient.new
+      run_batch(client, batch, state_dir:)
+      client.time_entries.first["hours"] = 1.0.next_float
+
+      status, result, = run_batch(client, batch, state_dir:)
+
+      assert_equal 1, status
+      assert_equal "external_reference_content_conflict", result.fetch("results").first.fetch("reason")
+      assert_equal 1, client.post_attempts
     end
   end
 
